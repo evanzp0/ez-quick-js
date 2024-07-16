@@ -3,4 +3,6 @@ name = "ez-quick-js"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
+[build-dependencies]
+cc = "1.1.5"
+copy_dir = "0.1.3"
