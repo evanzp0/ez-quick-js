@@ -6,3 +6,6 @@ edition = "2021"
 [build-dependencies]
 cc = "1.1.5"
 copy_dir = "0.1.3"
+
+[dependencies]
+anyhow = "1.0.86"

@@ -11,12 +11,18 @@
 // include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 // include!("static-functions.rs");
 
-mod ffi;
-pub(crate) use ffi::*;
+pub(crate) mod ffi;
+mod runtime;
+mod context;
+
+pub use runtime::*;
+pub use context::*;
 
 #[cfg(test)]
 mod tests {
     use std::ffi::CStr;
+
+    use ffi::*;
 
     use super::*;
 
