@@ -7,11 +7,12 @@ fn exists(path: impl AsRef<Path>) -> bool {
 }
 
 fn main() {
-    let embed_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("deps/quickjs");
+    let embed_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("deps");
+    let deps_code_path = embed_path.join("quickjs");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let code_dir = out_path.clone().join("quickjs");
-    if exists(&code_dir) {
-        std::fs::remove_dir_all(&code_dir).unwrap();
+    let out_code_dir = out_path.clone().join("quickjs");
+    if exists(&out_code_dir) {
+        std::fs::remove_dir_all(&out_code_dir).unwrap();
     }
 
     println!("cargo::rerun-if-changed={}", embed_path.to_str().unwrap());
@@ -20,18 +21,18 @@ fn main() {
     //     let os_type = std::env::consts::OS;
     // };
     
-    copy_dir::copy_dir(embed_path, &code_dir)
+    copy_dir::copy_dir(&deps_code_path, &out_code_dir)
         .expect("Could not copy quickjs directory");
     
-    // std::fs::copy(
-    //     embed_path.join("static-functions.c"),
-    //     code_dir.join("static-functions.c"),
-    // )
-    // .expect("Could not copy static-functions.c");
+    std::fs::copy(
+        embed_path.join("static-functions.c"),
+        out_code_dir.join("static-functions.c"),
+    )
+    .expect("Could not copy static-functions.c");
 
     eprintln!("Compiling quickjs...");
     let quickjs_version =
-        std::fs::read_to_string(code_dir.join("VERSION")).expect("failed to read quickjs version");
+        std::fs::read_to_string(out_code_dir.join("VERSION")).expect("failed to read quickjs version");
     cc::Build::new()
         .files(
             [
@@ -41,10 +42,10 @@ fn main() {
                 "libunicode.c",
                 "quickjs.c",
                 // Custom wrappers.
-                // "static-functions.c",
+                "static-functions.c",
             ]
             .iter()
-            .map(|f| code_dir.join(f)),
+            .map(|f| out_code_dir.join(f)),
         )
         .define("_GNU_SOURCE", None)
         .define(
