@@ -4,17 +4,15 @@
 //! wrapper.
 
 #![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(deref_nullptr)]
+#![allow(unused)]
 
 // include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 // include!("static-functions.rs");
 
-mod static_functions;
-mod bindings;
-pub use bindings::*;
-pub use static_functions::*;
+mod ffi;
+pub(crate) use ffi::*;
 
 #[cfg(test)]
 mod tests {
