@@ -1,10 +1,12 @@
 use crate::ffi::{js_new_float64, js_new_int32, js_new_string, js_to_float64, js_to_i32};
 
+type Opaque = crate::ffi::JSValue;
+
 macro_rules! struct_type {
     ($type:ident) => {
         pub struct $type<'a> {
             pub(crate) ctx: &'a crate::Context<'a>,
-            pub(crate) inner: crate::ffi::JSValue,
+            pub(crate) inner: Opaque,
         }
     };
 }
@@ -21,6 +23,14 @@ macro_rules! impl_type_fn {
 
             pub fn to_value(self) -> JsValue<'a> {
                 self.into()
+            }
+
+            pub fn opaque(&self) -> &Opaque {
+                &self.inner
+            }
+
+            pub fn context(&self) -> &crate::Context {
+                self.ctx
             }
         }
     };
@@ -164,7 +174,7 @@ pub enum JsTag {
 
 impl JsTag {
     #[inline]
-    pub fn from_c(value: &crate::ffi::JSValue) -> JsTag {
+    pub fn from_c(value: &Opaque) -> JsTag {
         let inner = unsafe { crate::ffi::js_value_get_tag(*value) };
         match inner {
             crate::ffi::JS_TAG_INT => JsTag::Int,
@@ -417,7 +427,7 @@ impl_try_from!(JsValue for JsString if v => v.is_string());
 
 struct_type!(JsValue);
 impl<'a> JsValue<'a> {
-    pub fn new(ctx: &'a crate::Context, value: crate::ffi::JSValue) -> Self {
+    pub fn new(ctx: &'a crate::Context, value: Opaque) -> Self {
         Self { ctx, inner: value }
     }
 
@@ -428,7 +438,7 @@ impl<'a> JsValue<'a> {
     /// Take out the underlying JSValue.
     ///
     /// Unsafe because the caller must ensure memory management. (eg JS_FreeValue)
-    pub unsafe fn take(self) -> crate::ffi::JSValue {
+    pub unsafe fn take(self) -> Opaque {
         let v = self.inner;
         std::mem::forget(self);
         v
