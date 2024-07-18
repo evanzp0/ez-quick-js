@@ -1,4 +1,7 @@
-use std::{borrow::Cow, ffi::{c_char, CStr}};
+use std::{
+    borrow::Cow,
+    ffi::{c_char, CStr},
+};
 
 use crate::ffi::*;
 
@@ -27,9 +30,26 @@ extern "C" {
     fn JS_IsSymbol_real(v: JSValue) -> bool;
     fn JS_IsObject_real(v: JSValue) -> bool;
     fn JS_ToUint32_real(ctx: *mut JSContext, pres: u32, val: JSValue) -> u32;
-    fn JS_SetProperty_real(ctx: *mut JSContext, this_obj: JSValue, prop: JSAtom, val: JSValue) -> ::std::os::raw::c_int;
-    fn JS_NewCFunction_real(ctx: *mut JSContext, func: *mut JSCFunction, name: *const ::std::os::raw::c_char,length: ::std::os::raw::c_int) -> JSValue;
-    fn JS_NewCFunctionMagic_real(ctx: *mut JSContext, func: *mut JSCFunctionMagic, name: *const ::std::os::raw::c_char, length: ::std::os::raw::c_int, cproto: JSCFunctionEnum, magic: ::std::os::raw::c_int) -> JSValue;
+    fn JS_SetProperty_real(
+        ctx: *mut JSContext,
+        this_obj: JSValue,
+        prop: JSAtom,
+        val: JSValue,
+    ) -> ::std::os::raw::c_int;
+    fn JS_NewCFunction_real(
+        ctx: *mut JSContext,
+        func: *mut JSCFunction,
+        name: *const ::std::os::raw::c_char,
+        length: ::std::os::raw::c_int,
+    ) -> JSValue;
+    fn JS_NewCFunctionMagic_real(
+        ctx: *mut JSContext,
+        func: *mut JSCFunctionMagic,
+        name: *const ::std::os::raw::c_char,
+        length: ::std::os::raw::c_int,
+        cproto: JSCFunctionEnum,
+        magic: ::std::os::raw::c_int,
+    ) -> JSValue;
 }
 
 pub unsafe fn js_value_get_tag(v: JSValue) -> i32 {
@@ -99,7 +119,7 @@ pub unsafe fn js_is_number(v: JSValue) -> bool {
 
 /// check if a JSValue is a BigInt
 pub unsafe fn js_is_bigint(ctx: *mut JSContext, v: JSValue) -> bool {
-    JS_IsBigInt_real(ctx,v)
+    JS_IsBigInt_real(ctx, v)
 }
 
 /// check if a JSValue is a BigFloat
@@ -128,7 +148,7 @@ pub unsafe fn js_is_undefined(v: JSValue) -> bool {
 }
 
 /// check if a JSValue is an Exception
-pub unsafe fn js_is_exception(v: JSValue) -> bool{
+pub unsafe fn js_is_exception(v: JSValue) -> bool {
     JS_IsException_real(v)
 }
 
@@ -158,17 +178,34 @@ pub unsafe fn js_to_uint32(ctx: *mut JSContext, pres: u32, val: JSValue) -> u32 
 }
 
 /// set a property of an object identified by a JSAtom
-pub unsafe fn js_set_property(ctx: *mut JSContext, this_obj: JSValue, prop: JSAtom, val: JSValue) -> ::std::os::raw::c_int {
+pub unsafe fn js_set_property(
+    ctx: *mut JSContext,
+    this_obj: JSValue,
+    prop: JSAtom,
+    val: JSValue,
+) -> ::std::os::raw::c_int {
     JS_SetProperty_real(ctx, this_obj, prop, val)
 }
 
 /// create a new Function based on a JSCFunction
-pub unsafe fn js_new_cfunction(ctx: *mut JSContext, func: *mut JSCFunction, name: *const ::std::os::raw::c_char,length: ::std::os::raw::c_int) -> JSValue {
+pub unsafe fn js_new_cfunction(
+    ctx: *mut JSContext,
+    func: *mut JSCFunction,
+    name: *const ::std::os::raw::c_char,
+    length: ::std::os::raw::c_int,
+) -> JSValue {
     JS_NewCFunction_real(ctx, func, name, length)
 }
 
 /// create a new Function based on a JSCFunction
-pub unsafe fn js_new_cfunction_magic(ctx: *mut JSContext, func: *mut JSCFunctionMagic, name: *const ::std::os::raw::c_char, length: ::std::os::raw::c_int, cproto: JSCFunctionEnum, magic: ::std::os::raw::c_int) -> JSValue {
+pub unsafe fn js_new_cfunction_magic(
+    ctx: *mut JSContext,
+    func: *mut JSCFunctionMagic,
+    name: *const ::std::os::raw::c_char,
+    length: ::std::os::raw::c_int,
+    cproto: JSCFunctionEnum,
+    magic: ::std::os::raw::c_int,
+) -> JSValue {
     JS_NewCFunctionMagic_real(ctx, func, name, length, cproto, magic)
 }
 
