@@ -1,9 +1,128 @@
-// use crate::{ffi::{js_new_int32, JSValue, JS_ToInt32}, Context};
-use crate::{
-    ffi::{js_new_float64, js_new_int32, js_new_string, js_to_float64, js_to_i32},
-    impl_clone, impl_deref, impl_drop, impl_from, impl_type_debug, impl_type_new, struct_type,
-    impl_try_from,
-};
+use crate::ffi::{js_new_float64, js_new_int32, js_new_string, js_to_float64, js_to_i32};
+
+macro_rules! struct_type {
+    ($type:ident) => {
+        pub struct $type<'a> {
+            pub(crate) ctx: &'a crate::Context<'a>,
+            pub(crate) inner: crate::ffi::JSValue,
+        }
+    };
+}
+
+macro_rules! impl_type_new {
+    ($type:ident, $val_type:ty, $js_ctor:path) => {
+        impl<'a> $type<'a> {
+            pub fn new(ctx: &'a crate::Context, v: $val_type) -> Self {
+                Self {
+                    ctx,
+                    inner: unsafe { $js_ctor(ctx.inner, v) },
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_type_debug {
+    ($type:ident, $fn:ident, $converter:path) => {
+        impl<'a> std::fmt::Debug for $type<'a> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let mut f = f.debug_tuple(stringify!($type));
+                // f.debug_struct("Integer").field("ctx", &self.ctx).field("inner", &self.inner).finish()
+                if JsTag::from_c(&self.inner).$fn() {
+                    let val = unsafe { $converter(self.ctx.inner, self.inner) };
+                    f.field(&val);
+                } else {
+                    f.field(&"unknown");
+                }
+
+                f.finish()
+            }
+        }
+    };
+}
+
+macro_rules! impl_drop {
+    { $type:ident } => {
+        impl<'a> Drop for $type<'a> {
+            fn drop(&mut self) {
+                unsafe {
+                    crate::ffi::js_free_value(self.ctx.inner, self.inner);
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_clone {
+    { $type:ident } => {
+        impl<'a> Clone for $type<'a> {
+            fn clone(&self) -> Self {
+                unsafe { crate::ffi::js_dup_value(self.ctx.inner, self.inner) };
+                Self {
+                    ctx: self.ctx,
+                    inner: self.inner,
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_deref {
+    { $target:ident for $type:ident } => {
+        impl Deref for $type {
+        type Target = $target;
+        fn deref(&self) -> &Self::Target {
+            unsafe { &*(self as *const _ as *const Self::Target) }
+        }
+        }
+    };
+}
+
+macro_rules! impl_from {
+    { $source:ident for $type:ident } => {
+        impl<'s> From<$source<'s>> for $type<'s> {
+            fn from(l: $source<'s>) -> Self {
+                unsafe { std::mem::transmute(l) }
+            }
+        }
+    };
+}
+
+macro_rules! impl_try_from {
+    { $source:ident for $target:ident if $value:ident => $check:expr } => {
+        impl<'s> TryFrom<$source<'s>> for $target<'s> {
+            type Error = crate::common::Error;
+            fn try_from(l: $source<'s>) -> Result<Self, Self::Error> {
+                // Not dead: `cast()` is sometimes used in the $check expression.
+                #[allow(dead_code)]
+                fn cast(l: $source) -> $target {
+                    unsafe { std::mem::transmute::<$source, $target>(l) }
+                }
+                match l {
+                    $value if $check => Ok(unsafe {
+                        std::mem::transmute::<$source<'s>, $target<'s>>($value)
+                    }),
+                    _ => Err(crate::common::Error::bad_type::<$source, $target>("TryFrom"))
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_is_fn {
+    { $type:ident, [$($fn:ident),* $(,)?]} => {
+        impl<'s> $type<'s> {
+            $(
+                pub fn $fn(&self) -> bool {
+                    self.tag().$fn()
+                }
+            )*
+
+        }
+    };
+}
+
+//////////////////////////////////////////////////////////
 
 #[repr(i32)]
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -246,9 +365,6 @@ impl_type_new!(JsInteger, i32, crate::ffi::js_new_int32);
 impl_drop!(JsInteger);
 impl_clone!(JsInteger);
 impl_try_from!(JsValue for JsInteger if v => v.is_int());
-
-
-
 impl<'a> From<JsNumber<'a>> for JsInteger<'a> {
     fn from(value: JsNumber<'a>) -> Self {
         let JsNumber {
@@ -270,6 +386,7 @@ impl_type_debug!(JsNumber, is_number, crate::ffi::js_to_float64);
 impl_drop!(JsNumber);
 impl_clone!(JsNumber);
 impl_from!(JsInteger for JsNumber);
+impl_try_from!(JsValue for JsNumber if v => v.is_number());
 
 struct_type!(Boolean);
 impl_type_new!(Boolean, bool, crate::ffi::js_new_bool);
@@ -292,11 +409,22 @@ impl<'a> JsValue<'a> {
     pub fn tag(&self) -> JsTag {
         JsTag::from_c(&self.inner)
     }
-
-    pub fn is_int(&self) -> bool {
-        self.tag().is_int()
-    }
 }
+impl_is_fn!(JsValue, [
+    is_undefined, 
+    is_object, 
+    is_exception,
+    is_int, 
+    is_number,
+    is_bool,
+    is_null,
+    is_module,
+    is_string,
+    is_symbol,
+    is_float64,
+    is_big_float,
+    is_big_decimal,
+]);
 impl<'a> std::fmt::Debug for JsValue<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("JsValue")
@@ -308,124 +436,3 @@ impl<'a> std::fmt::Debug for JsValue<'a> {
 impl_drop!(JsValue);
 impl_clone!(JsValue);
 impl_from!(JsInteger for JsValue);
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[macro_export]
-macro_rules! struct_type {
-    ($type:ident) => {
-        pub struct $type<'a> {
-            pub(crate) ctx: &'a crate::Context<'a>,
-            pub(crate) inner: crate::ffi::JSValue,
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! impl_type_new {
-    ($type:ident, $val_type:ty, $js_ctor:path) => {
-        impl<'a> $type<'a> {
-            pub fn new(ctx: &'a crate::Context, v: $val_type) -> Self {
-                Self {
-                    ctx,
-                    inner: unsafe { $js_ctor(ctx.inner, v) },
-                }
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! impl_type_debug {
-    ($type:ident, $fn:ident, $converter:path) => {
-        impl<'a> std::fmt::Debug for $type<'a> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let mut f = f.debug_tuple(stringify!($type));
-                // f.debug_struct("Integer").field("ctx", &self.ctx).field("inner", &self.inner).finish()
-                if JsTag::from_c(&self.inner).$fn() {
-                    let val = unsafe { $converter(self.ctx.inner, self.inner) };
-                    f.field(&val);
-                } else {
-                    f.field(&"unknown");
-                }
-
-                f.finish()
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! impl_drop {
-    { $type:ident } => {
-        impl<'a> Drop for $type<'a> {
-            fn drop(&mut self) {
-                unsafe {
-                    crate::ffi::js_free_value(self.ctx.inner, self.inner);
-                }
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! impl_clone {
-    { $type:ident } => {
-        impl<'a> Clone for $type<'a> {
-            fn clone(&self) -> Self {
-                unsafe { crate::ffi::js_dup_value(self.ctx.inner, self.inner) };
-                Self {
-                    ctx: self.ctx,
-                    inner: self.inner,
-                }
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! impl_deref {
-    { $target:ident for $type:ident } => {
-        impl Deref for $type {
-        type Target = $target;
-        fn deref(&self) -> &Self::Target {
-            unsafe { &*(self as *const _ as *const Self::Target) }
-        }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! impl_from {
-    { $source:ident for $type:ident } => {
-        impl<'s> From<$source<'s>> for $type<'s> {
-            fn from(l: $source<'s>) -> Self {
-                unsafe { std::mem::transmute(l) }
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! impl_try_from {
-    { $source:ident for $target:ident if $value:ident => $check:expr } => {
-        impl<'s> TryFrom<$source<'s>> for $target<'s> {
-            type Error = crate::common::Error;
-            fn try_from(l: $source<'s>) -> Result<Self, Self::Error> {
-                // Not dead: `cast()` is sometimes used in the $check expression.
-                #[allow(dead_code)]
-                fn cast(l: $source) -> $target {
-                    unsafe { std::mem::transmute::<$source, $target>(l) }
-                }
-                match l {
-                    $value if $check => Ok(unsafe {
-                        std::mem::transmute::<$source<'s>, $target<'s>>($value)
-                    }),
-                    _ => Err(crate::common::Error::bad_type::<$source, $target>("TryFrom"))
-                }
-            }
-        }
-    };
-}
-
-// impl_try_from!(JsValue for JsInteger if v => v.is_int());
