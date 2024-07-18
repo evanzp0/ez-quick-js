@@ -163,9 +163,6 @@ impl JsTag {
 //     pub(crate) inner: JSValue,
 // }
 
-/// A JavaScript value representing a signed integer.
-struct_type!(Integer);
-
 // impl<'a> Debug for Integer<'a> {
 //     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 //         let mut f = f.debug_tuple("Integer");
@@ -182,8 +179,6 @@ struct_type!(Integer);
 //     }
 // }
 
-impl_type_debug!(Integer, is_int, crate::ffi::JS_ToInt32);
-
 // impl<'a> Integer<'a> {
 //     pub fn new(ctx: &'a Context, v: i32) -> Self {
 //         Self {
@@ -193,6 +188,8 @@ impl_type_debug!(Integer, is_int, crate::ffi::JS_ToInt32);
 //     }
 // } 
 
+struct_type!(Integer);
+impl_type_debug!(Integer, is_int, crate::ffi::JS_ToInt32);
 impl_type_new!(Integer, i32, crate::ffi::js_new_int32);
 
 #[macro_export]
