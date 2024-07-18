@@ -109,15 +109,22 @@ macro_rules! impl_try_from {
     };
 }
 
-macro_rules! impl_is_fn {
-    { $type:ident, [$($fn:ident),* $(,)?]} => {
-        impl<'s> $type<'s> {
-            $(
-                pub fn $fn(&self) -> bool {
-                    self.tag().$fn()
-                }
-            )*
+// macro_rules! impl_is_fn {
+//     { [$($fn:ident),* $(,)?]} => {
+//         $(
+//             #[inline]
+//             pub fn $fn(&self) -> bool {
+//                 self.tag().$fn()
+//             }
+//         )*
+//     };
+// }
 
+macro_rules! impl_is_fn {
+    { $fn:ident } => {
+        #[inline]
+        pub fn $fn(&self) -> bool {
+            self.tag().$fn()
         }
     };
 }
@@ -409,22 +416,31 @@ impl<'a> JsValue<'a> {
     pub fn tag(&self) -> JsTag {
         JsTag::from_c(&self.inner)
     }
+
+    /// Take out the underlying JSValue.
+    ///
+    /// Unsafe because the caller must ensure memory management. (eg JS_FreeValue)
+    pub unsafe fn take(self) -> crate::ffi::JSValue {
+        let v = self.inner;
+        std::mem::forget(self);
+        v
+    }
+
+    impl_is_fn!(is_undefined);
+    impl_is_fn!(is_object);
+    impl_is_fn!(is_exception);
+    impl_is_fn!(is_int);
+    impl_is_fn!(is_number);
+    impl_is_fn!(is_bool);
+    impl_is_fn!(is_null);
+    impl_is_fn!(is_module);
+    impl_is_fn!(is_string);
+    impl_is_fn!(is_symbol);
+    impl_is_fn!(is_float64);
+    impl_is_fn!(is_big_float);
+    impl_is_fn!(is_big_decimal);
 }
-impl_is_fn!(JsValue, [
-    is_undefined, 
-    is_object, 
-    is_exception,
-    is_int, 
-    is_number,
-    is_bool,
-    is_null,
-    is_module,
-    is_string,
-    is_symbol,
-    is_float64,
-    is_big_float,
-    is_big_decimal,
-]);
+
 impl<'a> std::fmt::Debug for JsValue<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("JsValue")
@@ -436,3 +452,4 @@ impl<'a> std::fmt::Debug for JsValue<'a> {
 impl_drop!(JsValue);
 impl_clone!(JsValue);
 impl_from!(JsInteger for JsValue);
+
