@@ -1,7 +1,7 @@
 // use crate::{ffi::{js_new_int32, JSValue, JS_ToInt32}, Context};
 use crate::{
     ffi::{js_new_float64, js_new_int32, js_new_string, js_to_float64, js_to_i32},
-    impl_from, impl_type_debug, impl_type_new, struct_type,
+    impl_from, impl_type_debug, impl_type_new, struct_type, impl_drop, impl_clone,
 };
 
 #[repr(i32)]
@@ -167,6 +167,36 @@ impl JsTag {
     }
 }
 
+pub struct Atom<'a> {
+    pub(crate) ctx: &'a crate::Context<'a>,
+    pub(crate) inner: crate::ffi::JSAtom,
+}
+
+impl<'a> Atom<'a> {
+    #[inline]
+    pub fn new(ctx: &'a crate::Context, value: crate::ffi::JSAtom) -> Self {
+        Self { ctx, inner: value }
+    }
+}
+
+impl<'a> Drop for Atom<'a> {
+    fn drop(&mut self) {
+        unsafe {
+            crate::ffi::JS_FreeAtom(self.ctx.inner, self.inner);
+        }
+    }
+}
+
+impl<'a> Clone for Atom<'a> {
+    fn clone(&self) -> Self {
+        unsafe { crate::ffi::JS_DupAtom(self.ctx.inner, self.inner) };
+        Self {
+            ctx: self.ctx,
+            inner: self.inner,
+        }
+    }
+}
+
 // pub struct Integer<'a> {
 //     pub(crate) ctx: &'a Context<'a>,
 //     pub(crate) inner: JSValue,
@@ -197,6 +227,8 @@ impl JsTag {
 struct_type!(Integer);
 impl_type_debug!(Integer, is_int, crate::ffi::js_to_i32);
 impl_type_new!(Integer, i32, crate::ffi::js_new_int32);
+impl_drop!(Integer);
+impl_clone!(Integer);
 impl<'a> From<Number<'a>> for Integer<'a>{
     fn from(value: Number<'a>) -> Self {
         let Number {ctx, inner: inner_val} = value;
@@ -212,23 +244,29 @@ impl<'a> From<Number<'a>> for Integer<'a>{
     }
 }
 
-struct_type!(Boolean);
-impl_type_new!(Boolean, bool, crate::ffi::js_new_bool);
-impl_type_debug!(Boolean, is_bool, crate::ffi::js_to_bool);
-
 struct_type!(Number);
 impl_type_new!(Number, f64, crate::ffi::js_new_float64);
 impl_type_debug!(Number, is_number, crate::ffi::js_to_float64);
+impl_drop!(Number);
+impl_clone!(Number);
 impl_from!(Integer for Number);
+
+struct_type!(Boolean);
+impl_type_new!(Boolean, bool, crate::ffi::js_new_bool);
+impl_type_debug!(Boolean, is_bool, crate::ffi::js_to_bool);
+impl_drop!(Boolean);
+impl_clone!(Boolean);
 
 struct_type!(String);
 impl_type_new!(String, &str, crate::ffi::js_new_string);
 impl_type_debug!(String, is_string, crate::ffi::js_to_string);
+impl_drop!(String);
+impl_clone!(String);
 
 #[macro_export]
 macro_rules! struct_type {
-    ($tp_name:ident) => {
-        pub struct $tp_name<'a> {
+    ($type:ident) => {
+        pub struct $type<'a> {
             pub(crate) ctx: &'a crate::Context<'a>,
             pub inner: crate::ffi::JSValue,
         }
@@ -237,8 +275,8 @@ macro_rules! struct_type {
 
 #[macro_export]
 macro_rules! impl_type_new {
-    ($tp_name:ident, $val_type:ty, $js_ctor:path) => {
-        impl<'a> $tp_name<'a> {
+    ($type:ident, $val_type:ty, $js_ctor:path) => {
+        impl<'a> $type<'a> {
             pub fn new(ctx: &'a crate::Context, v: $val_type) -> Self {
                 Self {
                     ctx,
@@ -251,10 +289,10 @@ macro_rules! impl_type_new {
 
 #[macro_export]
 macro_rules! impl_type_debug {
-    ($tp_name:ident, $fn:ident, $converter:path) => {
-        impl<'a> std::fmt::Debug for $tp_name<'a> {
+    ($type:ident, $fn:ident, $converter:path) => {
+        impl<'a> std::fmt::Debug for $type<'a> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let mut f = f.debug_tuple(stringify!($tp_name));
+                let mut f = f.debug_tuple(stringify!($type));
                 // f.debug_struct("Integer").field("ctx", &self.ctx).field("inner", &self.inner).finish()
                 if JsTag::from_c(&self.inner).$fn() {
                     let val = unsafe { $converter(self.ctx.inner, self.inner) };
@@ -279,3 +317,32 @@ macro_rules! impl_from {
       }
     };
 }
+
+#[macro_export]
+macro_rules! impl_drop {
+    { $type:ident } => {
+        impl<'a> Drop for $type<'a> {
+            fn drop(&mut self) {
+                unsafe {
+                    crate::ffi::js_free_value(self.ctx.inner, self.inner);
+                }
+            }
+        }        
+    };
+}
+
+#[macro_export]
+macro_rules! impl_clone {
+    { $type:ident } => {
+        impl<'a> Clone for $type<'a> {
+            fn clone(&self) -> Self {
+                unsafe { crate::ffi::js_dup_value(self.ctx.inner, self.inner) };
+                Self {
+                    ctx: self.ctx,
+                    inner: self.inner,
+                }
+            }
+        }      
+    };
+}
+
