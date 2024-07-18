@@ -109,17 +109,6 @@ macro_rules! impl_try_from {
     };
 }
 
-// macro_rules! impl_is_fn {
-//     { [$($fn:ident),* $(,)?]} => {
-//         $(
-//             #[inline]
-//             pub fn $fn(&self) -> bool {
-//                 self.tag().$fn()
-//             }
-//         )*
-//     };
-// }
-
 macro_rules! impl_is_fn {
     { $fn:ident } => {
         #[inline]
@@ -140,6 +129,16 @@ macro_rules! impl_to_fn {
             self.try_into()
         }
     };
+}
+
+macro_rules! impl_to_value { 
+    { $type:ident } => {
+        impl<'a> $type<'a> {
+            pub fn to_value(self) -> JsValue<'a> {
+                self.into()
+            }
+        }
+    }
 }
 
 //////////////////////////////////////////////////////////
@@ -384,6 +383,7 @@ impl_type_debug!(JsInteger, is_int, crate::ffi::js_to_i32);
 impl_type_new!(JsInteger, i32, crate::ffi::js_new_int32);
 impl_drop!(JsInteger);
 impl_clone!(JsInteger);
+impl_to_value!(JsInteger);
 impl_try_from!(JsValue for JsInteger if v => v.is_int());
 impl<'a> From<JsNumber<'a>> for JsInteger<'a> {
     fn from(value: JsNumber<'a>) -> Self {
@@ -405,6 +405,7 @@ impl_type_new!(JsNumber, f64, crate::ffi::js_new_float64);
 impl_type_debug!(JsNumber, is_number, crate::ffi::js_to_float64);
 impl_drop!(JsNumber);
 impl_clone!(JsNumber);
+impl_to_value!(JsNumber);
 impl_from!(JsInteger for JsNumber);
 impl_try_from!(JsValue for JsNumber if v => v.is_number());
 
@@ -412,6 +413,7 @@ struct_type!(JsBoolean);
 impl_type_new!(JsBoolean, bool, crate::ffi::js_new_bool);
 impl_type_debug!(JsBoolean, is_bool, crate::ffi::js_to_bool);
 impl_drop!(JsBoolean);
+impl_to_value!(JsBoolean);
 impl_clone!(JsBoolean);
 impl_try_from!(JsValue for JsBoolean if v => v.is_bool());
 
@@ -419,6 +421,7 @@ struct_type!(JsString);
 impl_type_new!(JsString, &str, crate::ffi::js_new_string);
 impl_type_debug!(JsString, is_string, crate::ffi::js_to_string);
 impl_drop!(JsString);
+impl_to_value!(JsString);
 impl_clone!(JsString);
 impl_try_from!(JsValue for JsString if v => v.is_string());
 
