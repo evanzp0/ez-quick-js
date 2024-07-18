@@ -11,7 +11,7 @@
 // include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 // include!("static-functions.rs");
 
-pub(crate) mod ffi;
+pub mod ffi;
 mod runtime;
 mod context;
 mod data;

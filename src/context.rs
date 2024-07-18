@@ -5,7 +5,7 @@ use crate::{
 
 pub struct Context<'a> {
     runtime: &'a Runtime,
-    pub(crate) inner: *mut JSContext,
+    pub inner: *mut JSContext,
 }
 
 impl<'a> Context<'a> {

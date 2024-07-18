@@ -164,3 +164,21 @@ pub unsafe fn js_new_cfunction(ctx: *mut JSContext, func: *mut JSCFunction, name
 pub unsafe fn js_new_cfunction_magic(ctx: *mut JSContext, func: *mut JSCFunctionMagic, name: *const ::std::os::raw::c_char, length: ::std::os::raw::c_int, cproto: JSCFunctionEnum, magic: ::std::os::raw::c_int) -> JSValue {
     JS_NewCFunctionMagic_real(ctx, func, name, length, cproto, magic)
 }
+
+pub fn js_to_bool(ctx: *mut JSContext, val: JSValue) -> bool {
+    unsafe { JS_ToBool(ctx, val) == 1 }
+}
+
+pub fn js_to_i32(ctx: *mut JSContext, val: JSValue) -> i32 {
+    let mut rst = 0;
+    unsafe { JS_ToInt32(ctx, &mut rst as *mut i32, val) == 1 };
+
+    rst
+}
+
+pub fn js_to_float64(ctx: *mut JSContext, val: JSValue) -> f64 {
+    let mut rst = 0_f64;
+    unsafe { JS_ToFloat64(ctx, &mut rst as *mut f64, val) == 1 };
+
+    rst
+}
