@@ -129,6 +129,19 @@ macro_rules! impl_is_fn {
     };
 }
 
+macro_rules! impl_to_fn {
+    { $fn:ident, $type:ident, $tag:path, $is_fn:ident } => {
+        #[inline]
+        pub fn $fn(self) -> Result<$type<'a>, crate::common::Error> {
+            if !self.tag().$is_fn() {
+                Err(crate::common::Error::BadType(format!("Need {:?} but get {:?}", $tag, self.tag())))?
+            }
+            
+            self.try_into()
+        }
+    };
+}
+
 //////////////////////////////////////////////////////////
 
 #[repr(i32)]
@@ -395,17 +408,19 @@ impl_clone!(JsNumber);
 impl_from!(JsInteger for JsNumber);
 impl_try_from!(JsValue for JsNumber if v => v.is_number());
 
-struct_type!(Boolean);
-impl_type_new!(Boolean, bool, crate::ffi::js_new_bool);
-impl_type_debug!(Boolean, is_bool, crate::ffi::js_to_bool);
-impl_drop!(Boolean);
-impl_clone!(Boolean);
+struct_type!(JsBoolean);
+impl_type_new!(JsBoolean, bool, crate::ffi::js_new_bool);
+impl_type_debug!(JsBoolean, is_bool, crate::ffi::js_to_bool);
+impl_drop!(JsBoolean);
+impl_clone!(JsBoolean);
+impl_try_from!(JsValue for JsBoolean if v => v.is_bool());
 
 struct_type!(JsString);
 impl_type_new!(JsString, &str, crate::ffi::js_new_string);
 impl_type_debug!(JsString, is_string, crate::ffi::js_to_string);
 impl_drop!(JsString);
 impl_clone!(JsString);
+impl_try_from!(JsValue for JsString if v => v.is_string());
 
 struct_type!(JsValue);
 impl<'a> JsValue<'a> {
@@ -439,6 +454,11 @@ impl<'a> JsValue<'a> {
     impl_is_fn!(is_float64);
     impl_is_fn!(is_big_float);
     impl_is_fn!(is_big_decimal);
+    
+    impl_to_fn!(to_int, JsInteger, JsTag::Int, is_int);
+    impl_to_fn!(to_number, JsNumber, JsTag::Float64, is_number);
+    impl_to_fn!(to_bool, JsBoolean, JsTag::Bool, is_bool);
+    impl_to_fn!(to_string, JsString, JsTag::String, is_string);
 }
 
 impl<'a> std::fmt::Debug for JsValue<'a> {
@@ -452,4 +472,6 @@ impl<'a> std::fmt::Debug for JsValue<'a> {
 impl_drop!(JsValue);
 impl_clone!(JsValue);
 impl_from!(JsInteger for JsValue);
-
+impl_from!(JsNumber for JsValue);
+impl_from!(JsBoolean for JsValue);
+impl_from!(JsString for JsValue);
