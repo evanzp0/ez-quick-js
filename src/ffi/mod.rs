@@ -1,5 +1,5 @@
 mod static_functions;
 mod bindings;
 
-pub use bindings::*;
-pub use static_functions::*;
+pub(crate) use bindings::*;
+pub(crate) use static_functions::*;

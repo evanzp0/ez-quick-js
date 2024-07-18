@@ -283,7 +283,7 @@ macro_rules! struct_type {
     ($type:ident) => {
         pub struct $type<'a> {
             pub(crate) ctx: &'a crate::Context<'a>,
-            pub inner: crate::ffi::JSValue,
+            pub(crate) inner: crate::ffi::JSValue,
         }
     };
 }
