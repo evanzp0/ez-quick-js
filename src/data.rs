@@ -167,19 +167,19 @@ impl JsTag {
     }
 }
 
-pub struct Atom<'a> {
+pub struct JsAtom<'a> {
     pub(crate) ctx: &'a crate::Context<'a>,
     pub(crate) inner: crate::ffi::JSAtom,
 }
 
-impl<'a> Atom<'a> {
+impl<'a> JsAtom<'a> {
     #[inline]
     pub fn new(ctx: &'a crate::Context, value: crate::ffi::JSAtom) -> Self {
         Self { ctx, inner: value }
     }
 }
 
-impl<'a> Drop for Atom<'a> {
+impl<'a> Drop for JsAtom<'a> {
     fn drop(&mut self) {
         unsafe {
             crate::ffi::JS_FreeAtom(self.ctx.inner, self.inner);
@@ -187,7 +187,7 @@ impl<'a> Drop for Atom<'a> {
     }
 }
 
-impl<'a> Clone for Atom<'a> {
+impl<'a> Clone for JsAtom<'a> {
     fn clone(&self) -> Self {
         unsafe { crate::ffi::JS_DupAtom(self.ctx.inner, self.inner) };
         Self {
@@ -212,7 +212,6 @@ impl<'a> Clone for Atom<'a> {
 // impl<'a> Debug for Integer<'a> {
 //     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 //         let mut f = f.debug_tuple("Integer");
-//         // f.debug_struct("Integer").field("ctx", &self.ctx).field("inner", &self.inner).finish()
 //         if JsTag::from_c(&self.inner).is_int() {
 //             let mut val = 0;
 //             unsafe { JS_ToInt32(self.ctx.inner, &mut val, self.inner) };
@@ -224,14 +223,14 @@ impl<'a> Clone for Atom<'a> {
 //     }
 // }
 
-struct_type!(Integer);
-impl_type_debug!(Integer, is_int, crate::ffi::js_to_i32);
-impl_type_new!(Integer, i32, crate::ffi::js_new_int32);
-impl_drop!(Integer);
-impl_clone!(Integer);
-impl<'a> From<Number<'a>> for Integer<'a>{
-    fn from(value: Number<'a>) -> Self {
-        let Number {ctx, inner: inner_val} = value;
+struct_type!(JsInteger);
+impl_type_debug!(JsInteger, is_int, crate::ffi::js_to_i32);
+impl_type_new!(JsInteger, i32, crate::ffi::js_new_int32);
+impl_drop!(JsInteger);
+impl_clone!(JsInteger);
+impl<'a> From<JsNumber<'a>> for JsInteger<'a>{
+    fn from(value: JsNumber<'a>) -> Self {
+        let JsNumber {ctx, inner: inner_val} = value;
         let inner = {
             let v = js_to_i32(ctx.inner, inner_val);
             unsafe { js_new_int32(ctx.inner, v) }
@@ -244,12 +243,12 @@ impl<'a> From<Number<'a>> for Integer<'a>{
     }
 }
 
-struct_type!(Number);
-impl_type_new!(Number, f64, crate::ffi::js_new_float64);
-impl_type_debug!(Number, is_number, crate::ffi::js_to_float64);
-impl_drop!(Number);
-impl_clone!(Number);
-impl_from!(Integer for Number);
+struct_type!(JsNumber);
+impl_type_new!(JsNumber, f64, crate::ffi::js_new_float64);
+impl_type_debug!(JsNumber, is_number, crate::ffi::js_to_float64);
+impl_drop!(JsNumber);
+impl_clone!(JsNumber);
+impl_from!(JsInteger for JsNumber);
 
 struct_type!(Boolean);
 impl_type_new!(Boolean, bool, crate::ffi::js_new_bool);
@@ -257,11 +256,27 @@ impl_type_debug!(Boolean, is_bool, crate::ffi::js_to_bool);
 impl_drop!(Boolean);
 impl_clone!(Boolean);
 
-struct_type!(String);
-impl_type_new!(String, &str, crate::ffi::js_new_string);
-impl_type_debug!(String, is_string, crate::ffi::js_to_string);
-impl_drop!(String);
-impl_clone!(String);
+struct_type!(JsString);
+impl_type_new!(JsString, &str, crate::ffi::js_new_string);
+impl_type_debug!(JsString, is_string, crate::ffi::js_to_string);
+impl_drop!(JsString);
+impl_clone!(JsString);
+
+struct_type!(JsValue);
+impl<'a> JsValue<'a> {
+    pub fn new(ctx: &'a crate::Context, value: crate::ffi::JSValue) -> Self {
+        Self { ctx, inner: value }
+    }
+}
+impl<'a> std::fmt::Debug for JsValue<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("JsValue").field(&"..").finish()
+    }
+}
+impl_drop!(JsValue);
+impl_clone!(JsValue);
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[macro_export]
 macro_rules! struct_type {

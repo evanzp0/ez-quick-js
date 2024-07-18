@@ -1,5 +1,5 @@
 
-use ez_quick_js::{Context, Runtime, String as JsString};
+use ez_quick_js::{Context, Runtime, JsString};
 
 fn main() {
     let rt = Runtime::default();
