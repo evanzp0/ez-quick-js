@@ -14,9 +14,11 @@
 pub(crate) mod ffi;
 mod runtime;
 mod context;
+mod data;
 
 pub use runtime::*;
 pub use context::*;
+pub use data::*;
 
 #[cfg(test)]
 mod tests {

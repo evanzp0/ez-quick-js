@@ -1,5 +1,3 @@
-use anyhow::{bail, Result};
-
 use crate::ffi::{JSRuntime, JS_FreeRuntime, JS_NewRuntime, JS_SetMemoryLimit};
 
 pub struct Runtime {
@@ -7,10 +5,10 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    pub fn new(memory_limit: Option<usize>) -> Result<Self> {
+    pub fn new(memory_limit: Option<usize>) -> Self {
         let inner = unsafe { JS_NewRuntime() };
         if inner.is_null() {
-            bail!("Runtime create failed");
+            panic!("Runtime create failed");
         }
         // Configure memory limit if specified.
         if let Some(limit) = memory_limit {
@@ -19,7 +17,13 @@ impl Runtime {
             }
         }
 
-        Ok(Self { inner })
+        Self { inner }
+    }
+}
+
+impl Default for Runtime {
+    fn default() -> Self {
+        Self::new(None)
     }
 }
 

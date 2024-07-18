@@ -1,5 +1,3 @@
-use anyhow::{bail, Result};
-
 use crate::{
     ffi::{JSContext, JS_FreeContext, JS_FreeRuntime, JS_NewContext},
     Runtime,
@@ -7,17 +5,17 @@ use crate::{
 
 pub struct Context<'a> {
     runtime: &'a Runtime,
-    inner: *mut JSContext,
+    pub(crate) inner: *mut JSContext,
 }
 
 impl<'a> Context<'a> {
-    pub fn new(runtime: &'a Runtime) -> Result<Self> {
+    pub fn new(runtime: &'a Runtime) -> Self {
         let inner = unsafe { JS_NewContext(runtime.inner) };
         if inner.is_null() {
-            bail!("Context create failed");
+            panic!("Context create failed");
         }
 
-        Ok(Self { runtime, inner })
+        Self { runtime, inner }
     }
 }
 
