@@ -15,6 +15,7 @@ pub mod ffi;
 mod runtime;
 mod context;
 mod data;
+pub mod common;
 
 pub use runtime::*;
 pub use context::*;
