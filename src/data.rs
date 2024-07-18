@@ -1,6 +1,6 @@
 // use crate::{ffi::{js_new_int32, JSValue, JS_ToInt32}, Context};
 use crate::{
-    ffi::{js_new_float64, js_new_int32, js_to_float64, js_to_i32},
+    ffi::{js_new_float64, js_new_int32, js_new_string, js_to_float64, js_to_i32},
     impl_from, impl_type_debug, impl_type_new, struct_type,
 };
 
@@ -171,7 +171,14 @@ impl JsTag {
 //     pub(crate) ctx: &'a Context<'a>,
 //     pub(crate) inner: JSValue,
 // }
-
+// impl<'a> Integer<'a> {
+//     pub fn new(ctx: &'a Context, v: i32) -> Self {
+//         Self {
+//             ctx,
+//             inner: unsafe { js_new_int32(ctx.inner, v) },
+//         }
+//     }
+// }
 // impl<'a> Debug for Integer<'a> {
 //     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 //         let mut f = f.debug_tuple("Integer");
@@ -184,15 +191,6 @@ impl JsTag {
 //             f.field(&"unknown");
 //         }
 //         f.finish()
-//     }
-// }
-
-// impl<'a> Integer<'a> {
-//     pub fn new(ctx: &'a Context, v: i32) -> Self {
-//         Self {
-//             ctx,
-//             inner: unsafe { js_new_int32(ctx.inner, v) },
-//         }
 //     }
 // }
 
@@ -215,14 +213,17 @@ impl<'a> From<Number<'a>> for Integer<'a>{
 }
 
 struct_type!(Boolean);
-impl_type_debug!(Boolean, is_bool, crate::ffi::js_to_bool);
 impl_type_new!(Boolean, bool, crate::ffi::js_new_bool);
+impl_type_debug!(Boolean, is_bool, crate::ffi::js_to_bool);
 
 struct_type!(Number);
-impl_type_debug!(Number, is_number, crate::ffi::js_to_float64);
 impl_type_new!(Number, f64, crate::ffi::js_new_float64);
+impl_type_debug!(Number, is_number, crate::ffi::js_to_float64);
 impl_from!(Integer for Number);
 
+struct_type!(String);
+impl_type_new!(String, &str, crate::ffi::js_new_string);
+impl_type_debug!(String, is_string, crate::ffi::js_to_string);
 
 #[macro_export]
 macro_rules! struct_type {
@@ -230,6 +231,20 @@ macro_rules! struct_type {
         pub struct $tp_name<'a> {
             pub(crate) ctx: &'a crate::Context<'a>,
             pub inner: crate::ffi::JSValue,
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_type_new {
+    ($tp_name:ident, $val_type:ty, $js_ctor:path) => {
+        impl<'a> $tp_name<'a> {
+            pub fn new(ctx: &'a crate::Context, v: $val_type) -> Self {
+                Self {
+                    ctx,
+                    inner: unsafe { $js_ctor(ctx.inner, v) },
+                }
+            }
         }
     };
 }
@@ -249,20 +264,6 @@ macro_rules! impl_type_debug {
                 }
 
                 f.finish()
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! impl_type_new {
-    ($tp_name:ident, $val_type:ty, $js_ctor:path) => {
-        impl<'a> $tp_name<'a> {
-            pub fn new(ctx: &'a crate::Context, v: $val_type) -> Self {
-                Self {
-                    ctx,
-                    inner: unsafe { $js_ctor(ctx.inner, v) },
-                }
             }
         }
     };

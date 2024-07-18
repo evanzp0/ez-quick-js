@@ -1,5 +1,6 @@
-use crate::ffi::*;
+use std::{borrow::Cow, ffi::{c_char, CStr}};
 
+use crate::ffi::*;
 
 extern "C" {
     fn JS_ValueGetTag_real(v: JSValue) -> i32;
@@ -70,11 +71,17 @@ pub unsafe fn js_new_float64(ctx: *mut JSContext, v: f64) -> JSValue {
     JS_NewFloat64_real(ctx, v)
 }
 
+/// create a new String value
+pub unsafe fn js_new_string(ctx: *mut JSContext, v: &str) -> JSValue {
+    let mut val = format!("{v}\0");
+    let val = val.as_bytes();
+    JS_NewString(ctx, val as *const [u8] as *const c_char)
+}
+
 /// check if a JSValue is a NaN value
 pub unsafe fn js_value_is_nan(v: JSValue) -> bool {
     JS_VALUE_IS_NAN_real(v)
 }
-
 /// get a f64 value from a JSValue
 pub unsafe fn js_value_get_float64(v: JSValue) -> f64 {
     JS_VALUE_GET_FLOAT64_real(v)
@@ -181,4 +188,12 @@ pub fn js_to_float64(ctx: *mut JSContext, val: JSValue) -> f64 {
     unsafe { JS_ToFloat64(ctx, &mut rst as *mut f64, val) == 1 };
 
     rst
+}
+
+pub fn js_to_string<'a>(ctx: *mut JSContext, val: JSValue) -> Cow<'a, str> {
+    let mut len = 0_usize;
+    let val = unsafe { JS_ToCStringLen2(ctx, &mut len as *mut usize, val, 0) };
+    let val = unsafe { CStr::from_ptr(val) };
+
+    val.to_string_lossy()
 }
