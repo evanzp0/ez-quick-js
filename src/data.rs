@@ -11,7 +11,7 @@ macro_rules! struct_type {
     };
 }
 
-macro_rules! impl_type_fn {
+macro_rules! impl_type_common_fn {
     ($type:ident, $val_type:ty, $js_ctor:path) => {
         impl<'a> $type<'a> {
             pub fn new(ctx: &'a crate::Context, v: $val_type) -> Self {
@@ -384,7 +384,7 @@ impl<'a> Clone for JsAtom<'a> {
 
 struct_type!(JsInteger);
 impl_type_debug!(JsInteger, is_int, crate::ffi::js_to_i32);
-impl_type_fn!(JsInteger, i32, crate::ffi::js_new_int32);
+impl_type_common_fn!(JsInteger, i32, crate::ffi::js_new_int32);
 impl_drop!(JsInteger);
 impl_clone!(JsInteger);
 impl_try_from!(JsValue for JsInteger if v => v.is_int());
@@ -404,7 +404,7 @@ impl<'a> From<JsNumber<'a>> for JsInteger<'a> {
 }
 
 struct_type!(JsNumber);
-impl_type_fn!(JsNumber, f64, crate::ffi::js_new_float64);
+impl_type_common_fn!(JsNumber, f64, crate::ffi::js_new_float64);
 impl_type_debug!(JsNumber, is_number, crate::ffi::js_to_float64);
 impl_drop!(JsNumber);
 impl_clone!(JsNumber);
@@ -412,14 +412,14 @@ impl_from!(JsInteger for JsNumber);
 impl_try_from!(JsValue for JsNumber if v => v.is_number());
 
 struct_type!(JsBoolean);
-impl_type_fn!(JsBoolean, bool, crate::ffi::js_new_bool);
+impl_type_common_fn!(JsBoolean, bool, crate::ffi::js_new_bool);
 impl_type_debug!(JsBoolean, is_bool, crate::ffi::js_to_bool);
 impl_drop!(JsBoolean);
 impl_clone!(JsBoolean);
 impl_try_from!(JsValue for JsBoolean if v => v.is_bool());
 
 struct_type!(JsString);
-impl_type_fn!(JsString, &str, crate::ffi::js_new_string);
+impl_type_common_fn!(JsString, &str, crate::ffi::js_new_string);
 impl_type_debug!(JsString, is_string, crate::ffi::js_to_string);
 impl_drop!(JsString);
 impl_clone!(JsString);
