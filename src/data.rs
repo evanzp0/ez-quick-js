@@ -1,6 +1,6 @@
 // use crate::{ffi::{js_new_int32, JSValue, JS_ToInt32}, Context};
 use crate::{
-    ffi::{js_new_float64, js_to_i32},
+    ffi::{js_new_float64, js_new_int32, js_to_float64, js_to_i32},
     impl_from, impl_type_debug, impl_type_new, struct_type,
 };
 
@@ -196,24 +196,23 @@ impl JsTag {
 //     }
 // }
 
-// impl<'a> From<Integer<'a>> for Number<'a>{
-//     fn from(value: Integer<'a>) -> Self {
-//         let Integer {ctx, inner} = value;
-//         let inner = {
-//             let v = js_to_i32(ctx.inner, value.inner) as f64;
-//             unsafe { js_new_float64(ctx.inner, v) }
-//         };
-
-//         Self {
-//             ctx,
-//             inner
-//         }
-//     }
-// }
-
 struct_type!(Integer);
 impl_type_debug!(Integer, is_int, crate::ffi::js_to_i32);
 impl_type_new!(Integer, i32, crate::ffi::js_new_int32);
+impl<'a> From<Number<'a>> for Integer<'a>{
+    fn from(value: Number<'a>) -> Self {
+        let Number {ctx, inner: inner_val} = value;
+        let inner = {
+            let v = js_to_i32(ctx.inner, inner_val);
+            unsafe { js_new_int32(ctx.inner, v) }
+        };
+
+        Self {
+            ctx,
+            inner
+        }
+    }
+}
 
 struct_type!(Boolean);
 impl_type_debug!(Boolean, is_bool, crate::ffi::js_to_bool);
