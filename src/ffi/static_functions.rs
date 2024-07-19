@@ -95,7 +95,7 @@ pub unsafe fn js_new_string(ctx: *mut JSContext, v: &str) -> JSValue {
 }
 
 /// create a new Object value
-pub unsafe fn js_new_object(ctx: *mut JSContext, proto: Option<JSValue>) -> JSValue {
+pub unsafe fn js_new_object_with_proto(ctx: *mut JSContext, proto: Option<JSValue>) -> JSValue {
     if let Some(proto) = proto {
         JS_NewObjectProto(ctx, proto)
     } else {

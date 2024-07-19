@@ -519,7 +519,7 @@ impl_from!(JsString for JsValue);
 impl_from!(JsObject for JsValue);
 
 struct_type!(JsObject);
-impl_type_common_fn!(JsObject, Option<Opaque>, crate::ffi::js_new_object);
+impl_type_common_fn!(JsObject, Option<Opaque>, crate::ffi::js_new_object_with_proto);
 impl<'a> std::fmt::Debug for JsObject<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("JsObject")
