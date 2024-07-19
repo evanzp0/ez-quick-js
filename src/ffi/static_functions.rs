@@ -216,10 +216,6 @@ pub unsafe fn js_value_get_tag(v: JSValue) -> i32 {
     JS_ValueGetTag_real(v)
 }
 
-/// get a u32 value from a JSValue
-pub unsafe fn js_to_uint32(ctx: *mut JSContext, pres: u32, val: JSValue) -> u32 {
-    JS_ToUint32_real(ctx, pres, val)
-}
 
 pub fn js_to_bool(ctx: *mut JSContext, val: JSValue) -> bool {
     unsafe { JS_ToBool(ctx, val) == 1 }
@@ -287,7 +283,23 @@ pub fn js_equal(ctx: *mut JSContext, one: &JSValue, other: &JSValue) -> bool {
 #[cfg(test)]
 mod tests {
     use std::ffi::CStr;
+    use crate::{Context, JsInteger, Runtime};
+
     use super::*;
+
+    #[test]
+    fn test_to_fn() {
+        unsafe {
+            let rt = Runtime::new(None);
+            let ctx = &Context::new(&rt);
+            let js_int = JsInteger::new(ctx, 12);
+            let js_val = js_int.to_value();
+            let mut ret_val = 0_u32;
+            let rst = js_to_i32(ctx.inner, js_val.inner);
+
+            assert_eq!(12, rst);
+        }
+    }
 
     // Small sanity test that starts the runtime and evaluates code.
     #[test]
