@@ -1,0 +1,10 @@
+pub const EVAL_TYPE_GLOBAL: u32 = 0;
+pub const EVAL_TYPE_MODULE: u32 = 1;
+pub const EVAL_TYPE_DIRECT: u32 = 2;
+pub const EVAL_TYPE_INDIRECT: u32 = 3;
+pub const EVAL_TYPE_MASK: u32 = 3;
+pub const EVAL_FLAG_STRICT: u32 = 8;
+pub const EVAL_FLAG_STRIP: u32 = 16;
+pub const EVAL_FLAG_COMPILE_ONLY: u32 = 32;
+pub const EVAL_FLAG_BACKTRACE_BARRIER: u32 = 64;
+pub const EVAL_FLAG_ASYNC: u32 = 128;

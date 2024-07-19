@@ -1,7 +1,11 @@
+mod constant;
+
 use crate::{
     common::Error,
     ffi::{js_new_float64, js_new_int32, js_new_string, js_to_f64, js_to_i32},
 };
+
+pub use constant::*;
 
 type Opaque = crate::ffi::JSValue;
 
@@ -638,7 +642,6 @@ impl_drop!(JsFunction);
 mod tests {
     use crate::{
         common::Error,
-        ffi::JS_EVAL_TYPE_GLOBAL,
         function::{js_eval, js_get_global_object},
         Context, Runtime,
     };
@@ -700,7 +703,7 @@ mod tests {
             ctx,
             "function add(a) { return a + 1; }",
             "<input>",
-            crate::ffi::JS_EVAL_TYPE_GLOBAL,
+            EVAL_TYPE_GLOBAL,
         )
         .unwrap();
         let global_obj = js_get_global_object(ctx).unwrap().to_object().unwrap();
