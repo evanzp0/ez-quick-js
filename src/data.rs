@@ -479,9 +479,15 @@ impl<'a> JsValue<'a> {
         Self { ctx, inner: value }
     }
 
-    /// Take out the underlying JSValue.
-    ///
-    /// Unsafe because the caller must ensure memory management. (eg JS_FreeValue)
+    /// Check if this value is a Javascript function.
+    pub fn is_function(&self) -> bool {
+        unsafe { crate::ffi::JS_IsFunction(self.ctx.inner, self.inner) == 1 }
+    }
+
+    pub fn to_function(self) -> Result<JsFunction<'a>, Error> {
+        let js_fn: JsFunction = self.try_into()?;
+        Ok(js_fn)
+    }
 
     is_fn!(is_undefined);
     is_fn!(is_object);
@@ -498,18 +504,14 @@ impl<'a> JsValue<'a> {
     is_fn!(is_big_decimal);
     is_fn!(is_compiled_function);
 
-    /// Check if this value is a Javascript function.
-    #[inline]
-    pub fn is_function(&self) -> bool {
-        unsafe { crate::ffi::JS_IsFunction(self.ctx.inner, self.inner) == 1 }
-    }
-
     to_fn!(to_int, JsInteger, JsTag::Int, is_int);
     to_fn!(to_number, JsNumber, JsTag::Float64, is_number);
     to_fn!(to_bool, JsBoolean, JsTag::Bool, is_bool);
     to_fn!(to_string, JsString, JsTag::String, is_string);
     to_fn!(to_object, JsObject, JsTag::Object, is_object);
-
+    to_fn!(to_module, JsModule, JsTag::Module, is_module);
+    to_fn!(to_compiled_function, JsCompiledFunction, JsTag::FunctionBytecode, is_compiled_function);
+    
     opaque_fn!();
     context_fn!();
     tag_fn!();
@@ -532,6 +534,7 @@ impl_from!(JsString for JsValue);
 impl_from!(JsObject for JsValue);
 impl_from!(JsFunction for JsValue);
 impl_from!(JsCompiledFunction for JsValue);
+impl_from!(JsModule for JsValue);
 
 struct_type!(JsObject);
 impl_type_common_fn!(
@@ -675,6 +678,14 @@ impl_try_from!(JsValue for JsCompiledFunction if v => v.is_compiled_function());
 impl_drop!(JsCompiledFunction);
 impl_clone!(JsCompiledFunction);
 
+struct_type!(JsModule);
+impl<'a> JsModule<'a> {
+    to_value_fn!();
+}
+impl_try_from!(JsValue for JsModule if v => v.is_module());
+impl_drop!(JsModule);
+impl_clone!(JsModule);
+
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -754,6 +765,8 @@ mod tests {
         let script = "{5 + 1;}";
         let js_compiled_fn: JsCompiledFunction =
             compile(ctx, script, "<input>").unwrap().try_into().unwrap();
+        let js_compiled_val = js_compiled_fn.to_value();
+        let js_compiled_fn: JsCompiledFunction = js_compiled_val.try_into().unwrap();
         let rst = js_compiled_fn.eval().unwrap().to_int().unwrap().value();
         assert_eq!(6, rst);
     }

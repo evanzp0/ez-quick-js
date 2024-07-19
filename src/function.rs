@@ -163,6 +163,7 @@ mod tests {
         let js_compiled_val: JsCompiledFunction = compile(ctx, script, "<test>").unwrap().try_into().unwrap();
         let bytes = to_bytecode(ctx, &js_compiled_val);
         let js_compiled_val: JsCompiledFunction = from_bytecode(ctx, &bytes).unwrap().try_into().unwrap();
+        println!("{:?}", js_compiled_val.clone().to_value().tag());
 
         let rst: JsInteger = run_compiled_function(&js_compiled_val).unwrap().try_into().unwrap();
         assert_eq!(rst.value(), 7 * 5);
