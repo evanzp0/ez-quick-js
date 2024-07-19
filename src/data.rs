@@ -3,6 +3,7 @@ mod constant;
 use crate::{
     common::Error,
     ffi::{js_new_float64, js_new_int32, js_new_string, js_to_f64, js_to_i32},
+    function::{get_last_exception, run_compiled_function, to_bytecode},
 };
 
 pub use constant::*;
@@ -28,10 +29,7 @@ macro_rules! impl_type_common_fn {
                 }
             }
 
-            pub fn to_value(self) -> JsValue<'a> {
-                self.into()
-            }
-
+            to_value_fn!();
             opaque_fn!();
             context_fn!();
             tag_fn!();
@@ -177,6 +175,14 @@ macro_rules! forget_fn {
             let v = self.inner;
             std::mem::forget(self);
             v
+        }
+    };
+}
+
+macro_rules! to_value_fn {
+    {} => {
+        pub fn to_value(self) -> JsValue<'a> {
+            self.into()
         }
     };
 }
@@ -525,6 +531,7 @@ impl_from!(JsBoolean for JsValue);
 impl_from!(JsString for JsValue);
 impl_from!(JsObject for JsValue);
 impl_from!(JsFunction for JsValue);
+impl_from!(JsCompiledFunction for JsValue);
 
 struct_type!(JsObject);
 impl_type_common_fn!(
@@ -615,10 +622,6 @@ impl<'a> JsObject<'a> {
 
 struct_type!(JsFunction);
 impl<'a> JsFunction<'a> {
-    pub fn to_value(self) -> JsValue<'a> {
-        self.into()
-    }
-
     pub fn call(&self, args: Vec<JsValue<'a>>) -> Result<JsValue<'a>, crate::common::Error> {
         let mut qargs = args.iter().map(|arg| arg.inner).collect::<Vec<_>>();
         let len = qargs.len() as i32;
@@ -632,17 +635,51 @@ impl<'a> JsFunction<'a> {
                 qargs.as_mut_ptr(),
             )
         };
-        Ok(JsValue::new(self.ctx, rst))
+
+        let val = JsValue::new(self.ctx, rst);
+        if val.is_exception() {
+            if let Some(err) = get_last_exception(self.ctx) {
+                Err(err)?
+            } else {
+                Err(Error::ExecuteError(
+                    "JsFunction call() is failed".to_owned(),
+                ))?
+            }
+        }
+
+        Ok(val)
     }
+
+    to_value_fn!();
 }
 impl_try_from!(JsValue for JsFunction if v => v.is_function());
 impl_drop!(JsFunction);
+impl_clone!(JsFunction);
+
+struct_type!(JsCompiledFunction);
+impl<'a> JsCompiledFunction<'a> {
+    /// Evaluate this compiled function and return the resulting value.
+    pub fn eval(&'a self) -> Result<JsValue<'a>, crate::common::Error> {
+        let val = run_compiled_function(self)?;
+        Ok(val)
+    }
+
+    /// Convert this compiled function into QuickJS bytecode.
+    pub fn to_bytecode(&self) -> Result<Vec<u8>, Error> {
+        Ok(to_bytecode(self.ctx, self))
+    }
+
+    to_value_fn!();
+}
+impl_try_from!(JsValue for JsCompiledFunction if v => v.is_compiled_function());
+impl_drop!(JsCompiledFunction);
+impl_clone!(JsCompiledFunction);
 
 #[cfg(test)]
 mod tests {
     use crate::{
         common::Error,
-        function::{js_eval, js_get_global_object},
+        function::{compile, js_eval, js_get_global_object},
         Context, Runtime,
     };
 
@@ -699,13 +736,8 @@ mod tests {
         let val = js_prop.property("name1");
         assert!(val.is_none());
 
-        let js_val = js_eval(
-            ctx,
-            "function add(a) { return a + 1; }",
-            "<input>",
-            EVAL_TYPE_GLOBAL,
-        )
-        .unwrap();
+        let script = "function add(a) { return a + 1; }";
+        let js_val = js_eval(ctx, script, "<input>", EVAL_TYPE_GLOBAL).unwrap();
         let global_obj = js_get_global_object(ctx).unwrap().to_object().unwrap();
         let js_fn = global_obj.property("add").unwrap();
         assert!(js_fn.is_function());
@@ -718,5 +750,11 @@ mod tests {
             .unwrap()
             .value();
         assert_eq!(3, rst);
+
+        let script = "{5 + 1;}";
+        let js_compiled_fn: JsCompiledFunction =
+            compile(ctx, script, "<input>").unwrap().try_into().unwrap();
+        let rst = js_compiled_fn.eval().unwrap().to_int().unwrap().value();
+        assert_eq!(6, rst);
     }
 }

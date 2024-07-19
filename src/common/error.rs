@@ -4,6 +4,10 @@ use thiserror::Error;
 pub enum Error {
     #[error("General error: {0}")]
     GeneralError(String),
+    #[error("Error: Out of Memory")]
+    OutOfMemoryError,
+    #[error("Execute error: {0}")]
+    ExecuteError(String),
     #[error("Property error: {0}")]
     PropertyError(String),
     #[error("Bad type error: {0}")]

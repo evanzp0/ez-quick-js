@@ -1,12 +1,19 @@
+use std::ffi::c_void;
+
 use crate::{
-    common::{make_cstring, Error}, Context, JsFunction, JsValue
+    common::{make_cstring, Error},
+    ffi::{
+        js_free, JS_EvalFunction, JS_GetException, JS_ReadObject, JS_WriteObject,
+        JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE,
+    },
+    Context, JsCompiledFunction, JsFunction, JsValue, EVAL_FLAG_COMPILE_ONLY,
 };
 
 pub fn js_eval<'a>(
     ctx: &'a Context,
     code: &str,
     file_name: &str,
-    eval_flags: u32,
+    eval_flags: i32,
 ) -> Result<JsValue<'a>, Error> {
     let len = code.as_bytes().len();
     let code = make_cstring(code)?;
@@ -17,9 +24,13 @@ pub fn js_eval<'a>(
             code.as_ptr(),
             len,
             file_name.as_ptr(),
-            eval_flags as i32,
+            eval_flags,
         )
     };
+
+    if unsafe { crate::ffi::js_is_exception(val) } {
+        Err(Error::ExecuteError("JS_Eval() is failed".to_owned()))?
+    }
 
     Ok(JsValue::new(ctx, val))
 }
@@ -30,6 +41,130 @@ pub fn js_get_global_object<'a>(ctx: &'a Context) -> Result<JsValue<'a>, Error> 
     if val.is_exception() {
         Err(Error::GeneralError("Can't get global object".to_owned()))?
     }
-    
+
     Ok(val)
+}
+
+/// Get the last exception from the runtime, and if present, convert it to a Error.
+pub fn get_last_exception<'a>(ctx: &Context<'a>) -> Option<Error> {
+    let value = unsafe {
+        let raw = JS_GetException(ctx.inner);
+        JsValue::new(ctx, raw)
+    };
+
+    if value.is_null() {
+        None
+    } else if value.is_exception() {
+        Some(Error::GeneralError(
+            "Could get exception from runtime".into(),
+        ))
+    } else {
+        match value.to_string() {
+            Ok(strval) => {
+                let val = strval.value();
+                if val.contains("out of memory") {
+                    Some(Error::OutOfMemoryError)
+                } else {
+                    Some(Error::GeneralError(val.to_string()))
+                }
+            }
+            Err(e) => Some(e),
+        }
+    }
+}
+
+/// compile a script, will result in a JSValueRef with tag JS_TAG_FUNCTION_BYTECODE or JS_TAG_MODULE.
+///  It can be executed with run_compiled_function().
+pub fn compile<'a>(ctx: &'a Context, script: &str, file_name: &str) -> Result<JsValue<'a>, Error> {
+    js_eval(ctx, script, file_name, EVAL_FLAG_COMPILE_ONLY)
+}
+
+/// run a compiled function, see compile for an example
+pub fn run_compiled_function<'a>(func: &'a JsCompiledFunction) -> Result<JsValue<'a>, Error> {
+    let ctx = func.ctx;
+    let val = unsafe {
+        // NOTE: JS_EvalFunction takes ownership.
+        // We clone the func and extract the inner JsValue by forget().
+        let f = func.clone().to_value().forget();
+        let v = JS_EvalFunction(ctx.inner, f);
+
+        v
+    };
+
+    if unsafe { crate::ffi::js_is_exception(val) } {
+        if let Some(err) = get_last_exception(ctx) {
+            Err(err)?
+        } else {
+            Err(Error::GeneralError("Could not evaluate compiled function".to_owned()))?
+        }
+    }
+
+    Ok(JsValue::new(ctx, val))
+}
+
+/// write a function to bytecode
+pub fn to_bytecode<'a>(ctx: &'a Context, compiled_func: &JsCompiledFunction) -> Vec<u8> {
+    unsafe {
+        let mut len = 0;
+        let raw = JS_WriteObject(
+            ctx.inner,
+            &mut len,
+            compiled_func.inner,
+            JS_WRITE_OBJ_BYTECODE as i32,
+        );
+        let slice = std::slice::from_raw_parts(raw, len as usize);
+        let data = slice.to_vec();
+        js_free(ctx.inner, raw as *mut c_void);
+
+        data
+    }
+}
+
+/// read a compiled function from bytecode, see to_bytecode for an example
+pub fn from_bytecode<'a>(ctx: &'a Context, bytecode: &[u8]) -> Result<JsValue<'a>, Error> {
+    if bytecode.is_empty() {
+        Err(Error::GeneralError(
+            "from_bytecode() failed, bytecode length is 0".to_owned(),
+        ))?
+    }
+
+    let len = bytecode.len();
+    let buf = bytecode.as_ptr();
+    let raw = unsafe { JS_ReadObject(ctx.inner, buf, len as _, JS_READ_OBJ_BYTECODE as i32) };
+
+    let func = JsValue::new(ctx, raw);
+    if func.is_exception() {
+        let rst = get_last_exception(ctx);
+
+        if let Some(err) = rst {
+            Err(err)?
+        } else {
+            Err(Error::GeneralError(
+                "from_bytecode() failed and could not get exception".to_string(),
+            ))?
+        }
+    } else {
+        Ok(func)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{JsInteger, Runtime};
+
+    use super::*;
+
+    #[test]
+    fn test_compile_and_run() {
+        let rt = Runtime::default();
+        let ctx = &Context::new(&rt);
+        
+        let script = "{let a = 7; let b = 5; a * b;}";
+        let js_compiled_val: JsCompiledFunction = compile(ctx, script, "<test>").unwrap().try_into().unwrap();
+        let bytes = to_bytecode(ctx, &js_compiled_val);
+        let js_compiled_val: JsCompiledFunction = from_bytecode(ctx, &bytes).unwrap().try_into().unwrap();
+
+        let rst: JsInteger = run_compiled_function(&js_compiled_val).unwrap().try_into().unwrap();
+        assert_eq!(rst.value(), 7 * 5);
+    }
 }
