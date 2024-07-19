@@ -5,6 +5,9 @@ use std::{
 
 use crate::{ffi::*, JsTag};
 
+pub const NULL_PTR: *mut crate::ffi::JSValue = std::ptr::null_mut();
+pub const JS_UNDEFINED: crate::ffi::JSValue = JSValue { u: JSValueUnion{ int32: 0 }, tag: JS_TAG_UNDEFINED as i64 };
+
 extern "C" {
     fn JS_ValueGetTag_real(v: JSValue) -> i32;
     fn JS_DupValue_real(ctx: *mut JSContext, v: JSValue);

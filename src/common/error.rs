@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("General error: {0}")]
+    GeneralError(String),
     #[error("Property error: {0}")]
     PropertyError(String),
     #[error("Bad type error: {0}")]

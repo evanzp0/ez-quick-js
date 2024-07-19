@@ -1,4 +1,7 @@
-use crate::ffi::{js_new_float64, js_new_int32, js_new_string, js_to_f64, js_to_i32};
+use crate::{
+    common::Error,
+    ffi::{js_new_float64, js_new_int32, js_new_string, js_to_f64, js_to_i32},
+};
 
 type Opaque = crate::ffi::JSValue;
 
@@ -134,7 +137,7 @@ macro_rules! to_fn {
             if !self.tag().$is_fn() {
                 Err(crate::common::Error::BadType(format!("Need {:?} but get {:?}", $tag, self.tag())))?
             }
-            
+
             self.try_into()
         }
     };
@@ -469,7 +472,7 @@ impl<'a> JsValue<'a> {
     /// Take out the underlying JSValue.
     ///
     /// Unsafe because the caller must ensure memory management. (eg JS_FreeValue)
-    
+
     is_fn!(is_undefined);
     is_fn!(is_object);
     is_fn!(is_exception);
@@ -490,7 +493,7 @@ impl<'a> JsValue<'a> {
     pub fn is_function(&self) -> bool {
         unsafe { crate::ffi::JS_IsFunction(self.ctx.inner, self.inner) == 1 }
     }
-    
+
     to_fn!(to_int, JsInteger, JsTag::Int, is_int);
     to_fn!(to_number, JsNumber, JsTag::Float64, is_number);
     to_fn!(to_bool, JsBoolean, JsTag::Bool, is_bool);
@@ -517,9 +520,14 @@ impl_from!(JsNumber for JsValue);
 impl_from!(JsBoolean for JsValue);
 impl_from!(JsString for JsValue);
 impl_from!(JsObject for JsValue);
+impl_from!(JsFunction for JsValue);
 
 struct_type!(JsObject);
-impl_type_common_fn!(JsObject, Option<Opaque>, crate::ffi::js_new_object_with_proto);
+impl_type_common_fn!(
+    JsObject,
+    Option<Opaque>,
+    crate::ffi::js_new_object_with_proto
+);
 impl<'a> std::fmt::Debug for JsObject<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("JsObject")
@@ -589,7 +597,9 @@ impl<'a> JsObject<'a> {
             );
 
             if ret < 0 {
-                Err(crate::common::Error::PropertyError("Could not set property".into()))
+                Err(crate::common::Error::PropertyError(
+                    "Could not set property".into(),
+                ))
             } else {
                 // Now we can call forget to prevent calling the destructor.
                 std::mem::forget(value);
@@ -599,9 +609,39 @@ impl<'a> JsObject<'a> {
     }
 }
 
+struct_type!(JsFunction);
+impl<'a> JsFunction<'a> {
+    pub fn to_value(self) -> JsValue<'a> {
+        self.into()
+    }
+
+    pub fn call(&self, args: Vec<JsValue<'a>>) -> Result<JsValue<'a>, crate::common::Error> {
+        let mut qargs = args.iter().map(|arg| arg.inner).collect::<Vec<_>>();
+        let len = qargs.len() as i32;
+
+        let rst = unsafe {
+            crate::ffi::JS_Call(
+                self.ctx.inner,
+                self.inner,
+                crate::ffi::JS_UNDEFINED,
+                len,
+                qargs.as_mut_ptr(),
+            )
+        };
+        Ok(JsValue::new(self.ctx, rst))
+    }
+}
+impl_try_from!(JsValue for JsFunction if v => v.is_function());
+impl_drop!(JsFunction);
+
 #[cfg(test)]
 mod tests {
-    use crate::{Context, Runtime};
+    use crate::{
+        common::Error,
+        ffi::JS_EVAL_TYPE_GLOBAL,
+        function::{js_eval, js_get_global_object},
+        Context, Runtime,
+    };
 
     use super::*;
 
@@ -617,7 +657,7 @@ mod tests {
         let val_1 = JsInteger::new(ctx, 2);
         let val_2 = JsInteger::new(ctx, 3);
         assert_ne!(val_1, val_2);
-    
+
         let val_1 = JsNumber::new(ctx, 3_f64);
         let val_2 = val_1.clone().to_value();
         let val_3: JsNumber = val_2.to_number().unwrap();
@@ -655,5 +695,25 @@ mod tests {
         assert_eq!(2, val.value());
         let val = js_prop.property("name1");
         assert!(val.is_none());
+
+        let js_val = js_eval(
+            ctx,
+            "function add(a) { return a + 1; }",
+            "<input>",
+            crate::ffi::JS_EVAL_TYPE_GLOBAL,
+        )
+        .unwrap();
+        let global_obj = js_get_global_object(ctx).unwrap().to_object().unwrap();
+        let js_fn = global_obj.property("add").unwrap();
+        assert!(js_fn.is_function());
+
+        let js_fn: JsFunction = js_fn.try_into().unwrap();
+        let rst = js_fn
+            .call(vec![JsInteger::new(ctx, 2).into()])
+            .unwrap()
+            .to_int()
+            .unwrap()
+            .value();
+        assert_eq!(3, rst);
     }
 }

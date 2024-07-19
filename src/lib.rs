@@ -16,6 +16,7 @@ mod runtime;
 mod context;
 mod data;
 pub mod common;
+pub mod function;
 
 pub use runtime::*;
 pub use context::*;
