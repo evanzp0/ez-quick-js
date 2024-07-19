@@ -52,10 +52,6 @@ extern "C" {
     ) -> JSValue;
 }
 
-pub unsafe fn js_value_get_tag(v: JSValue) -> i32 {
-    JS_ValueGetTag_real(v)
-}
-
 /// Increment the refcount of this value
 pub unsafe fn js_dup_value(ctx: *mut JSContext, v: JSValue) {
     JS_DupValue_real(ctx, v);
@@ -181,11 +177,6 @@ pub unsafe fn js_is_object(v: JSValue) -> bool {
     JS_IsObject_real(v)
 }
 
-/// get a u32 value from a JSValue
-pub unsafe fn js_to_uint32(ctx: *mut JSContext, pres: u32, val: JSValue) -> u32 {
-    JS_ToUint32_real(ctx, pres, val)
-}
-
 /// set a property of an object identified by a JSAtom
 pub unsafe fn js_set_property(
     ctx: *mut JSContext,
@@ -218,6 +209,15 @@ pub unsafe fn js_new_cfunction_magic(
     JS_NewCFunctionMagic_real(ctx, func, name, length, cproto, magic)
 }
 
+pub unsafe fn js_value_get_tag(v: JSValue) -> i32 {
+    JS_ValueGetTag_real(v)
+}
+
+/// get a u32 value from a JSValue
+pub unsafe fn js_to_uint32(ctx: *mut JSContext, pres: u32, val: JSValue) -> u32 {
+    JS_ToUint32_real(ctx, pres, val)
+}
+
 pub fn js_to_bool(ctx: *mut JSContext, val: JSValue) -> bool {
     unsafe { JS_ToBool(ctx, val) == 1 }
 }
@@ -229,11 +229,16 @@ pub fn js_to_i32(ctx: *mut JSContext, val: JSValue) -> i32 {
     rst
 }
 
-pub fn js_to_float64(ctx: *mut JSContext, val: JSValue) -> f64 {
-    let mut rst = 0_f64;
-    unsafe { JS_ToFloat64(ctx, &mut rst as *mut f64, val) };
-
-    rst
+pub fn js_to_f64(ctx: *mut JSContext, val: JSValue) -> f64 {
+    match JsTag::from_c(&val) {
+        JsTag::Int => unsafe { val.u.int32 as f64 },
+        JsTag::Float64 => unsafe { val.u.float64 },
+        JsTag::BigFloat => todo!(),
+        JsTag::BigDecimal => todo!(),
+        _other => {
+            unreachable!()
+        }
+    }
 }
 
 pub fn js_to_string<'a>(ctx: *mut JSContext, val: JSValue) -> Cow<'a, str> {

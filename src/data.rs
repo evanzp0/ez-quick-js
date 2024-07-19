@@ -1,4 +1,4 @@
-use crate::ffi::{js_new_float64, js_new_int32, js_new_string, js_to_float64, js_to_i32};
+use crate::ffi::{js_new_float64, js_new_int32, js_new_string, js_to_f64, js_to_i32};
 
 type Opaque = crate::ffi::JSValue;
 
@@ -122,7 +122,6 @@ macro_rules! impl_try_from {
 
 macro_rules! is_fn {
     { $fn:ident } => {
-        #[inline]
         pub fn $fn(&self) -> bool {
             self.tag().$fn()
         }
@@ -131,7 +130,6 @@ macro_rules! is_fn {
 
 macro_rules! to_fn {
     { $fn:ident, $type:ident, $tag:path, $is_fn:ident } => {
-        #[inline]
         pub fn $fn(self) -> Result<$type<'a>, crate::common::Error> {
             if !self.tag().$is_fn() {
                 Err(crate::common::Error::BadType(format!("Need {:?} but get {:?}", $tag, self.tag())))?
@@ -144,16 +142,6 @@ macro_rules! to_fn {
 
 macro_rules! opaque_fn {
     {} => {
-        #[inline]
-        pub fn opaque(&self) -> &Opaque {
-            &self.inner
-        }
-    };
-}
-
-macro_rules! opaque_fn {
-    {} => {
-        #[inline]
         pub fn opaque(&self) -> &Opaque {
             &self.inner
         }
@@ -162,7 +150,6 @@ macro_rules! opaque_fn {
 
 macro_rules! context_fn {
     {} => {
-        #[inline]
         pub fn context(&self) -> &crate::Context {
             self.ctx
         }
@@ -171,7 +158,6 @@ macro_rules! context_fn {
 
 macro_rules! tag_fn {
     {} => {
-        #[inline]
         pub fn tag(&self) -> JsTag {
             JsTag::from_c(self.opaque())
         }
@@ -180,7 +166,6 @@ macro_rules! tag_fn {
 
 macro_rules! forget_fn {
     {} => {
-        #[inline]
         pub unsafe fn forget(self) -> Opaque {
             let v = self.inner;
             std::mem::forget(self);
@@ -189,7 +174,15 @@ macro_rules! forget_fn {
     };
 }
 
-
+macro_rules! impl_value_fn {
+    {$type:ident, $fn:ident, $ret_type:path} => {
+        impl<'a> $type<'a> {
+            pub fn value(&self) -> $ret_type {
+                crate::ffi::$fn(self.ctx.inner, self.inner)
+            }
+        }
+    };
+}
 
 macro_rules! impl_eq {
     { for $type:ident } => {
@@ -434,16 +427,18 @@ impl<'a> From<JsNumber<'a>> for JsInteger<'a> {
 }
 impl_eq!(for JsInteger);
 impl_partial_eq!(JsInteger for JsInteger);
+impl_value_fn!(JsInteger, js_to_i32, i32);
 
 struct_type!(JsNumber);
 impl_type_common_fn!(JsNumber, f64, crate::ffi::js_new_float64);
-impl_type_debug!(JsNumber, is_number, crate::ffi::js_to_float64);
+impl_type_debug!(JsNumber, is_number, crate::ffi::js_to_f64);
 impl_drop!(JsNumber);
 impl_clone!(JsNumber);
 impl_from!(JsInteger for JsNumber);
 impl_try_from!(JsValue for JsNumber if v => v.is_number());
 impl_eq!(for JsNumber);
 impl_partial_eq!(JsNumber for JsNumber);
+impl_value_fn!(JsNumber, js_to_f64, f64);
 
 struct_type!(JsBoolean);
 impl_type_common_fn!(JsBoolean, bool, crate::ffi::js_new_bool);
@@ -453,6 +448,7 @@ impl_clone!(JsBoolean);
 impl_try_from!(JsValue for JsBoolean if v => v.is_bool());
 impl_eq!(for JsBoolean);
 impl_partial_eq!(JsBoolean for JsBoolean);
+impl_value_fn!(JsBoolean, js_to_bool, bool);
 
 struct_type!(JsString);
 impl_type_common_fn!(JsString, &str, crate::ffi::js_new_string);
@@ -462,6 +458,7 @@ impl_clone!(JsString);
 impl_try_from!(JsValue for JsString if v => v.is_string());
 impl_eq!(for JsString);
 impl_partial_eq!(JsString for JsString);
+impl_value_fn!(JsString, js_to_string, std::borrow::Cow<'_, str>);
 
 struct_type!(JsValue);
 impl<'a> JsValue<'a> {
@@ -498,6 +495,7 @@ impl<'a> JsValue<'a> {
     to_fn!(to_number, JsNumber, JsTag::Float64, is_number);
     to_fn!(to_bool, JsBoolean, JsTag::Bool, is_bool);
     to_fn!(to_string, JsString, JsTag::String, is_string);
+    to_fn!(to_object, JsObject, JsTag::Object, is_object);
 
     opaque_fn!();
     context_fn!();
@@ -649,5 +647,13 @@ mod tests {
 
         let js_val = unsafe { val_1.forget() };
         unsafe { crate::ffi::js_free_value(ctx.inner, js_val) };
+
+        let js_prop = JsObject::new(ctx, None);
+        let prop_val = JsInteger::new(ctx, 2);
+        js_prop.set_property("name", prop_val.into());
+        let val = js_prop.property("name").unwrap().to_int().unwrap();
+        assert_eq!(2, val.value());
+        let val = js_prop.property("name1");
+        assert!(val.is_none());
     }
 }
