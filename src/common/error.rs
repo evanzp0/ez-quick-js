@@ -2,8 +2,12 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Property error: {0}")]
+    PropertyError(String),
     #[error("Bad type error: {0}")]
-    BadType(String)
+    BadType(String),
+    #[error("Value error: {0}")]
+    ValueError(String),
 }
 
 impl Error {

@@ -25,13 +25,10 @@ macro_rules! impl_type_common_fn {
                 self.into()
             }
 
-            pub fn opaque(&self) -> &Opaque {
-                &self.inner
-            }
-
-            pub fn context(&self) -> &crate::Context {
-                self.ctx
-            }
+            opaque_fn!();
+            context_fn!();
+            tag_fn!();
+            forget_fn!();
         }
     };
 }
@@ -42,7 +39,7 @@ macro_rules! impl_type_debug {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let mut f = f.debug_tuple(stringify!($type));
                 // f.debug_struct("Integer").field("ctx", &self.ctx).field("inner", &self.inner).finish()
-                if JsTag::from_c(&self.inner).$fn() {
+                if self.tag().$fn() {
                     let val = unsafe { $converter(self.ctx.inner, self.inner) };
                     f.field(&val);
                 } else {
@@ -123,7 +120,7 @@ macro_rules! impl_try_from {
     };
 }
 
-macro_rules! impl_is_fn {
+macro_rules! is_fn {
     { $fn:ident } => {
         #[inline]
         pub fn $fn(&self) -> bool {
@@ -132,7 +129,7 @@ macro_rules! impl_is_fn {
     };
 }
 
-macro_rules! impl_to_fn {
+macro_rules! to_fn {
     { $fn:ident, $type:ident, $tag:path, $is_fn:ident } => {
         #[inline]
         pub fn $fn(self) -> Result<$type<'a>, crate::common::Error> {
@@ -144,6 +141,55 @@ macro_rules! impl_to_fn {
         }
     };
 }
+
+macro_rules! opaque_fn {
+    {} => {
+        #[inline]
+        pub fn opaque(&self) -> &Opaque {
+            &self.inner
+        }
+    };
+}
+
+macro_rules! opaque_fn {
+    {} => {
+        #[inline]
+        pub fn opaque(&self) -> &Opaque {
+            &self.inner
+        }
+    };
+}
+
+macro_rules! context_fn {
+    {} => {
+        #[inline]
+        pub fn context(&self) -> &crate::Context {
+            self.ctx
+        }
+    };
+}
+
+macro_rules! tag_fn {
+    {} => {
+        #[inline]
+        pub fn tag(&self) -> JsTag {
+            JsTag::from_c(self.opaque())
+        }
+    };
+}
+
+macro_rules! forget_fn {
+    {} => {
+        #[inline]
+        pub unsafe fn forget(self) -> Opaque {
+            let v = self.inner;
+            std::mem::forget(self);
+            v
+        }
+    };
+}
+
+
 
 macro_rules! impl_eq {
     { for $type:ident } => {
@@ -326,6 +372,12 @@ impl JsTag {
     pub fn is_big_decimal(&self) -> bool {
         matches!(self, Self::BigDecimal)
     }
+
+    /// Check if this value is a bytecode compiled function.
+    #[inline]
+    pub fn is_compiled_function(&self) -> bool {
+        matches!(self, Self::FunctionBytecode)
+    }
 }
 
 pub struct JsAtom<'a> {
@@ -417,37 +469,40 @@ impl<'a> JsValue<'a> {
         Self { ctx, inner: value }
     }
 
-    pub fn tag(&self) -> JsTag {
-        JsTag::from_c(&self.inner)
-    }
-
     /// Take out the underlying JSValue.
     ///
     /// Unsafe because the caller must ensure memory management. (eg JS_FreeValue)
-    pub unsafe fn take(self) -> Opaque {
-        let v = self.inner;
-        std::mem::forget(self);
-        v
-    }
-
-    impl_is_fn!(is_undefined);
-    impl_is_fn!(is_object);
-    impl_is_fn!(is_exception);
-    impl_is_fn!(is_int);
-    impl_is_fn!(is_number);
-    impl_is_fn!(is_bool);
-    impl_is_fn!(is_null);
-    impl_is_fn!(is_module);
-    impl_is_fn!(is_string);
-    impl_is_fn!(is_symbol);
-    impl_is_fn!(is_float64);
-    impl_is_fn!(is_big_float);
-    impl_is_fn!(is_big_decimal);
     
-    impl_to_fn!(to_int, JsInteger, JsTag::Int, is_int);
-    impl_to_fn!(to_number, JsNumber, JsTag::Float64, is_number);
-    impl_to_fn!(to_bool, JsBoolean, JsTag::Bool, is_bool);
-    impl_to_fn!(to_string, JsString, JsTag::String, is_string);
+    is_fn!(is_undefined);
+    is_fn!(is_object);
+    is_fn!(is_exception);
+    is_fn!(is_int);
+    is_fn!(is_number);
+    is_fn!(is_bool);
+    is_fn!(is_null);
+    is_fn!(is_module);
+    is_fn!(is_string);
+    is_fn!(is_symbol);
+    is_fn!(is_float64);
+    is_fn!(is_big_float);
+    is_fn!(is_big_decimal);
+    is_fn!(is_compiled_function);
+
+    /// Check if this value is a Javascript function.
+    #[inline]
+    pub fn is_function(&self) -> bool {
+        unsafe { crate::ffi::JS_IsFunction(self.ctx.inner, self.inner) == 1 }
+    }
+    
+    to_fn!(to_int, JsInteger, JsTag::Int, is_int);
+    to_fn!(to_number, JsNumber, JsTag::Float64, is_number);
+    to_fn!(to_bool, JsBoolean, JsTag::Bool, is_bool);
+    to_fn!(to_string, JsString, JsTag::String, is_string);
+
+    opaque_fn!();
+    context_fn!();
+    tag_fn!();
+    forget_fn!();
 }
 impl<'a> std::fmt::Debug for JsValue<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -478,6 +533,73 @@ impl<'a> std::fmt::Debug for JsObject<'a> {
 impl_drop!(JsObject);
 impl_clone!(JsObject);
 impl_try_from!(JsValue for JsObject if v => v.is_object());
+impl<'a> JsObject<'a> {
+    pub fn property(&self, name: &str) -> Option<JsValue<'a>> {
+        // TODO: prevent allocation
+        let cname = if let Ok(val) = crate::common::make_cstring(name) {
+            val
+        } else {
+            return None;
+        };
+
+        let value = {
+            let val = unsafe {
+                crate::ffi::JS_GetPropertyStr(self.ctx.inner, self.inner, cname.as_ptr())
+            };
+            JsValue::new(self.ctx, val)
+        };
+        let tag = value.tag();
+
+        if tag.is_exception() {
+            None
+        } else if tag.is_undefined() {
+            None
+        } else {
+            Some(value)
+        }
+    }
+
+    /// Determine if the object is a promise by checking the presence of
+    /// a 'then' and a 'catch' property.
+    pub fn is_promise(&self) -> bool {
+        if let Some(p) = self.property("then") {
+            if p.is_function() {
+                return true;
+            }
+        }
+        if let Some(p) = self.property("catch") {
+            if p.is_function() {
+                return false;
+            }
+        }
+        false
+    }
+
+    pub fn set_property(&self, name: &str, value: JsValue<'a>) -> Result<(), crate::common::Error> {
+        let cname = crate::common::make_cstring(name)?;
+        unsafe {
+            // NOTE: SetPropertyStr takes ownership of the value.
+            // We do not, however, call JsValue::forget immediately, so
+            // the inner Opaque is still managed.
+            // `mem::forget` is called below only if SetProperty succeeds.
+            // This prevents leaks when an error occurs.
+            let ret = crate::ffi::JS_SetPropertyStr(
+                self.ctx.inner,
+                self.inner,
+                cname.as_ptr(),
+                value.inner,
+            );
+
+            if ret < 0 {
+                Err(crate::common::Error::PropertyError("Could not set property".into()))
+            } else {
+                // Now we can call forget to prevent calling the destructor.
+                std::mem::forget(value);
+                Ok(())
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -524,5 +646,8 @@ mod tests {
         let val_1 = JsString::new(&ctx, "ab1");
         let val_2 = JsString::new(&ctx, "ab2");
         assert_ne!(val_1, val_2);
+
+        let js_val = unsafe { val_1.forget() };
+        unsafe { crate::ffi::js_free_value(ctx.inner, js_val) };
     }
 }
