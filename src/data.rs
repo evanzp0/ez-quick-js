@@ -145,6 +145,24 @@ macro_rules! impl_to_fn {
     };
 }
 
+macro_rules! impl_eq {
+    { for $type:ident } => {
+        impl<'a> Eq for $type<'a> {}
+    };
+}
+
+macro_rules! impl_partial_eq {
+    { $rhs:ident for $type:ident } => {
+        impl<'s> PartialEq<$rhs<'s>> for $type<'s> {
+            fn eq(&self, other: &$rhs) -> bool {
+                let a = self.opaque();
+                let b = other.opaque();
+                unsafe { crate::ffi::js_equal(self.context().inner, a, b) }
+            }
+        }
+    };
+}
+
 //////////////////////////////////////////////////////////
 
 #[repr(i32)]
@@ -340,47 +358,7 @@ impl<'a> Clone for JsAtom<'a> {
     }
 }
 
-// pub struct Integer<'a> {
-//     pub(crate) ctx: &'a Context<'a>,
-//     pub(crate) inner: JSValue,
-// }
-// impl<'a> Integer<'a> {
-//     pub fn new(ctx: &'a Context, v: i32) -> Self {
-//         Self {
-//             ctx,
-//             inner: unsafe { js_new_int32(ctx.inner, v) },
-//         }
-//     }
-// }
-// impl<'a> Debug for Integer<'a> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         let mut f = f.debug_tuple("Integer");
-//         if JsTag::from_c(&self.inner).is_int() {
-//             let mut val = 0;
-//             unsafe { JS_ToInt32(self.ctx.inner, &mut val, self.inner) };
-//             f.field(&val);
-//         } else {
-//             f.field(&"unknown");
-//         }
-//         f.finish()
-//     }
-// }
-// impl<'s> TryFrom<JsValue<'s>> for JsInteger<'s> {
-//     type Error = crate::common::Error;
-//     fn try_from(l: JsValue<'s>) -> Result<Self, Self::Error> {
-//         // Not dead: `cast()` is sometimes used in the $check expression.
-//         #[allow(dead_code)]
-//         fn cast(l: JsValue) -> JsInteger {
-//             unsafe { std::mem::transmute::<JsValue, JsInteger>(l) }
-//         }
-//         match l {
-//             value if value.is_int() => Ok(unsafe {
-//                 std::mem::transmute::<JsValue<'s>, JsInteger<'s>>(value)
-//             }),
-//             _ => Err(crate::common::Error::bad_type::<JsValue, JsInteger>("TryFrom"))
-//         }
-//     }
-// }
+//////////////////////////////////////////////////////////////
 
 struct_type!(JsInteger);
 impl_type_debug!(JsInteger, is_int, crate::ffi::js_to_i32);
@@ -402,6 +380,8 @@ impl<'a> From<JsNumber<'a>> for JsInteger<'a> {
         Self { ctx, inner }
     }
 }
+impl_eq!(for JsInteger);
+impl_partial_eq!(JsInteger for JsInteger);
 
 struct_type!(JsNumber);
 impl_type_common_fn!(JsNumber, f64, crate::ffi::js_new_float64);
@@ -410,6 +390,8 @@ impl_drop!(JsNumber);
 impl_clone!(JsNumber);
 impl_from!(JsInteger for JsNumber);
 impl_try_from!(JsValue for JsNumber if v => v.is_number());
+impl_eq!(for JsNumber);
+impl_partial_eq!(JsNumber for JsNumber);
 
 struct_type!(JsBoolean);
 impl_type_common_fn!(JsBoolean, bool, crate::ffi::js_new_bool);
@@ -417,6 +399,8 @@ impl_type_debug!(JsBoolean, is_bool, crate::ffi::js_to_bool);
 impl_drop!(JsBoolean);
 impl_clone!(JsBoolean);
 impl_try_from!(JsValue for JsBoolean if v => v.is_bool());
+impl_eq!(for JsBoolean);
+impl_partial_eq!(JsBoolean for JsBoolean);
 
 struct_type!(JsString);
 impl_type_common_fn!(JsString, &str, crate::ffi::js_new_string);
@@ -424,6 +408,8 @@ impl_type_debug!(JsString, is_string, crate::ffi::js_to_string);
 impl_drop!(JsString);
 impl_clone!(JsString);
 impl_try_from!(JsValue for JsString if v => v.is_string());
+impl_eq!(for JsString);
+impl_partial_eq!(JsString for JsString);
 
 struct_type!(JsValue);
 impl<'a> JsValue<'a> {
@@ -463,7 +449,6 @@ impl<'a> JsValue<'a> {
     impl_to_fn!(to_bool, JsBoolean, JsTag::Bool, is_bool);
     impl_to_fn!(to_string, JsString, JsTag::String, is_string);
 }
-
 impl<'a> std::fmt::Debug for JsValue<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("JsValue")
@@ -478,3 +463,66 @@ impl_from!(JsInteger for JsValue);
 impl_from!(JsNumber for JsValue);
 impl_from!(JsBoolean for JsValue);
 impl_from!(JsString for JsValue);
+impl_from!(JsObject for JsValue);
+
+struct_type!(JsObject);
+impl_type_common_fn!(JsObject, Option<Opaque>, crate::ffi::js_new_object);
+impl<'a> std::fmt::Debug for JsObject<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("JsObject")
+            .field(&self.opaque().tag)
+            .field(&"...")
+            .finish()
+    }
+}
+impl_drop!(JsObject);
+impl_clone!(JsObject);
+impl_try_from!(JsValue for JsObject if v => v.is_object());
+
+#[cfg(test)]
+mod tests {
+    use crate::{Context, Runtime};
+
+    use super::*;
+
+    #[test]
+    fn test_data() {
+        let rt = Runtime::default();
+        let ctx = &Context::new(&rt);
+
+        let val_1 = JsInteger::new(ctx, 2);
+        let val_2 = JsInteger::new(ctx, 2);
+        assert_eq!(val_1, val_2);
+
+        let val_1 = JsInteger::new(ctx, 2);
+        let val_2 = JsInteger::new(ctx, 3);
+        assert_ne!(val_1, val_2);
+    
+        let val_1 = JsNumber::new(ctx, 3_f64);
+        let val_2 = val_1.clone().to_value();
+        let val_3: JsNumber = val_2.to_number().unwrap();
+        assert_eq!(val_1, val_3);
+
+        let val_1 = JsNumber::new(ctx, 3.14);
+        let val_2 = val_1.clone().to_value();
+        let val_3: JsNumber = val_2.to_number().unwrap();
+        assert_eq!(val_1, val_3);
+
+        let val_1 = JsNumber::new(ctx, 3.14);
+        let val_2 = JsNumber::new(ctx, 3_f64);
+        assert_ne!(val_1, val_2);
+
+        let val_1 = JsString::new(&ctx, "abc");
+        let val_2 = val_1.clone().to_value();
+        let val_3: JsString = val_2.to_string().unwrap();
+        assert_eq!(val_1, val_3);
+
+        let val_1 = JsString::new(&ctx, "abc");
+        let val_2 = JsString::new(&ctx, "abc");
+        assert_eq!(val_1, val_2);
+
+        let val_1 = JsString::new(&ctx, "ab1");
+        let val_2 = JsString::new(&ctx, "ab2");
+        assert_ne!(val_1, val_2);
+    }
+}

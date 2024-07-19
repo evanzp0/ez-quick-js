@@ -3,7 +3,7 @@ use std::{
     ffi::{c_char, CStr},
 };
 
-use crate::ffi::*;
+use crate::{ffi::*, JsTag};
 
 extern "C" {
     fn JS_ValueGetTag_real(v: JSValue) -> i32;
@@ -96,6 +96,15 @@ pub unsafe fn js_new_string(ctx: *mut JSContext, v: &str) -> JSValue {
     let mut val = format!("{v}\0");
     let val = val.as_bytes();
     JS_NewString(ctx, val as *const [u8] as *const c_char)
+}
+
+/// create a new Object value
+pub unsafe fn js_new_object(ctx: *mut JSContext, proto: Option<JSValue>) -> JSValue {
+    if let Some(proto) = proto {
+        JS_NewObjectProto(ctx, proto)
+    } else {
+        JS_NewObject(ctx)
+    }
 }
 
 /// check if a JSValue is a NaN value
@@ -215,14 +224,14 @@ pub fn js_to_bool(ctx: *mut JSContext, val: JSValue) -> bool {
 
 pub fn js_to_i32(ctx: *mut JSContext, val: JSValue) -> i32 {
     let mut rst = 0;
-    unsafe { JS_ToInt32(ctx, &mut rst as *mut i32, val) == 1 };
+    unsafe { JS_ToInt32(ctx, &mut rst as *mut i32, val) };
 
     rst
 }
 
 pub fn js_to_float64(ctx: *mut JSContext, val: JSValue) -> f64 {
     let mut rst = 0_f64;
-    unsafe { JS_ToFloat64(ctx, &mut rst as *mut f64, val) == 1 };
+    unsafe { JS_ToFloat64(ctx, &mut rst as *mut f64, val) };
 
     rst
 }
@@ -233,4 +242,35 @@ pub fn js_to_string<'a>(ctx: *mut JSContext, val: JSValue) -> Cow<'a, str> {
     let val = unsafe { CStr::from_ptr(val) };
 
     val.to_string_lossy()
+}
+
+pub fn js_equal(ctx: *mut JSContext, one: &JSValue, other: &JSValue) -> bool {
+    if one.tag != other.tag {
+        return false;
+    }
+
+    match one.tag as i32 {
+        crate::ffi::JS_TAG_INT => unsafe { one.u.int32 == other.u.int32 },
+        crate::ffi::JS_TAG_BOOL => unsafe { one.u.int32 == other.u.int32 },
+        crate::ffi::JS_TAG_NULL => unsafe { one.u.int32 == other.u.int32 },
+        crate::ffi::JS_TAG_FLOAT64 => unsafe { one.u.float64 == other.u.float64 },
+        crate::ffi::JS_TAG_STRING => unsafe {
+            js_to_string(ctx, *one) == js_to_string(ctx, *other)
+        },
+        crate::ffi::JS_TAG_MODULE => todo!(),
+        crate::ffi::JS_TAG_OBJECT => todo!(),
+        crate::ffi::JS_TAG_SYMBOL => todo!(),
+        crate::ffi::JS_TAG_BIG_FLOAT => todo!(),
+        crate::ffi::JS_TAG_EXCEPTION => todo!(),
+        crate::ffi::JS_TAG_UNDEFINED => todo!(),
+        crate::ffi::JS_TAG_BIG_DECIMAL => todo!(),
+        crate::ffi::JS_TAG_CATCH_OFFSET => todo!(),
+        crate::ffi::JS_TAG_UNINITIALIZED => todo!(),
+        crate::ffi::JS_TAG_FUNCTION_BYTECODE => todo!(),
+        #[cfg(feature = "bigint")]
+        ffi::JS_TAG_BIG_INT => JsTag::BigInt,
+        _other => {
+            unreachable!()
+        }
+    }
 }
