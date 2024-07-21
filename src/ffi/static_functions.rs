@@ -7,7 +7,10 @@ use crate::{ffi::*, JsTag};
 
 pub const NULL_PTR: *mut crate::ffi::JSValue = std::ptr::null_mut();
 pub const NULL_SIZE: *mut usize = std::ptr::null_mut();
-pub const JS_UNDEFINED: crate::ffi::JSValue = JSValue { u: JSValueUnion{ int32: 0 }, tag: JS_TAG_UNDEFINED as i64 };
+pub const JS_UNDEFINED: crate::ffi::JSValue = JSValue {
+    u: JSValueUnion { int32: 0 },
+    tag: JS_TAG_UNDEFINED as i64,
+};
 
 extern "C" {
     fn JS_ValueGetTag_real(v: JSValue) -> i32;
@@ -181,7 +184,6 @@ pub unsafe fn js_value_get_tag(v: JSValue) -> i32 {
     JS_ValueGetTag_real(v)
 }
 
-
 pub fn js_to_bool(ctx: *mut JSContext, val: JSValue) -> bool {
     unsafe { JS_ToBool(ctx, val) == 1 }
 }
@@ -246,8 +248,8 @@ pub fn js_equal(ctx: *mut JSContext, one: &JSValue, other: &JSValue) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::CStr;
     use crate::{Context, JsInteger, Runtime};
+    use std::ffi::CStr;
 
     use super::*;
 

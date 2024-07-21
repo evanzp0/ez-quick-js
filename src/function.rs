@@ -3,7 +3,10 @@ use std::ffi::c_void;
 use crate::{
     common::{make_cstring, Error},
     ffi::{
-        js_free, js_new_object_with_proto, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor, JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionMagic, JS_EvalFunction, JS_GetException, JS_NewCFunction2, JS_ReadObject, JS_WriteObject, JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE
+        js_free, js_new_object_with_proto, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor,
+        JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionMagic, JSContext, JSValue, JS_EvalFunction,
+        JS_GetException, JS_NewCFunction2, JS_ReadObject, JS_WriteObject, JS_READ_OBJ_BYTECODE,
+        JS_WRITE_OBJ_BYTECODE,
     },
     Context, JsCompiledFunction, JsFunction, JsValue,
 };
@@ -80,7 +83,12 @@ pub fn get_last_exception<'a>(ctx: &Context<'a>) -> Option<Error> {
 /// compile a script, will result in a JSValueRef with tag JS_TAG_FUNCTION_BYTECODE or JS_TAG_MODULE.
 ///  It can be executed with run_compiled_function().
 pub fn compile<'a>(ctx: &'a Context, script: &str, file_name: &str) -> Result<JsValue<'a>, Error> {
-    js_eval(ctx, script, file_name, crate::ffi::JS_EVAL_FLAG_COMPILE_ONLY as i32)
+    js_eval(
+        ctx,
+        script,
+        file_name,
+        crate::ffi::JS_EVAL_FLAG_COMPILE_ONLY as i32,
+    )
 }
 
 /// run a compiled function, see compile for an example
@@ -158,7 +166,7 @@ pub fn new_cfunction<'a>(
     ctx: &'a Context,
     func: JSCFunction,
     name: &str,
-    arg_count: i32
+    arg_count: i32,
 ) -> Result<JsValue<'a>, Error> {
     new_cfunction2(ctx, func, name, arg_count, false)
 }
@@ -189,15 +197,10 @@ pub fn new_cfunction_magic<'a>(
         JSCFunctionEnum_JS_CFUNC_generic
     };
 
-    let value = unsafe { crate::ffi::JS_NewCFunction2(
-        ctx.inner,
-        func,
-        name.as_ptr(),
-        arg_count,
-        cproto,
-        magic,
-    ) };
-    
+    let value = unsafe {
+        crate::ffi::JS_NewCFunction2(ctx.inner, func, name.as_ptr(), arg_count, cproto, magic)
+    };
+
     Ok(JsValue::new(ctx, value))
 }
 
@@ -209,7 +212,7 @@ pub fn get_global_object<'a>(ctx: &'a Context) -> JsValue<'a> {
 pub fn new_object_with_proto<'a>(ctx: &'a Context, proto: Option<JsValue>) -> JsValue<'a> {
     let proto = proto.map(|val| val.inner);
     let val = unsafe { js_new_object_with_proto(ctx.inner, proto) };
-    
+
     JsValue::new(ctx, val)
 }
 

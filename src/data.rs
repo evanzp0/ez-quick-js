@@ -1,6 +1,9 @@
 use crate::{
     common::{make_cstring, Error},
-    ffi::{js_dup_value, js_free_value, js_new_float64, js_new_int32, js_new_string, js_to_f64, js_to_i32, JSRefCountHeader, JSValue},
+    ffi::{
+        js_dup_value, js_free_value, js_new_float64, js_new_int32, js_new_string, js_to_f64,
+        js_to_i32, JSContext, JSRefCountHeader, JSValue,
+    },
     function::{get_last_exception, run_compiled_function, to_bytecode},
 };
 
@@ -210,6 +213,13 @@ macro_rules! impl_partial_eq {
 }
 
 //////////////////////////////////////////////////////////
+
+pub type CFunctionInner = unsafe extern "C" fn(
+    ctx: *mut JSContext,
+    this_val: JSValue,
+    argc: ::std::os::raw::c_int,
+    argv: *mut JSValue,
+) -> JSValue;
 
 #[repr(i32)]
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -521,24 +531,23 @@ impl<'a> JsValue<'a> {
         self.inner
     }
 
-    pub fn set_property(
-        &self,
-        prop_name: &str,
-        prop_value: JsValue,
-    ) -> Result<(), Error> {
+    pub fn set_property(&self, prop_name: &str, prop_value: JsValue) -> Result<(), Error> {
         let p_name = make_cstring(prop_name)?;
 
-        let val = unsafe { 
+        let val = unsafe {
             crate::ffi::JS_SetPropertyStr(
-                self.ctx.inner, 
+                self.ctx.inner,
                 self.inner,
                 p_name.as_ptr(),
                 prop_value.dup_value(),
-            ) 
+            )
         };
 
         if val == -1 {
-            Err(Error::GeneralError(format!("Set property '{}' for object is failed", prop_name)))?;
+            Err(Error::GeneralError(format!(
+                "Set property '{}' for object is failed",
+                prop_name
+            )))?;
         }
 
         // unsafe { prop_value.forget() };

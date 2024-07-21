@@ -2,7 +2,6 @@ use std::fs;
 
 use ez_quick_js::{
     ffi::{js_to_string, JSContext, JSValue, JS_EVAL_TYPE_GLOBAL, JS_UNDEFINED},
-    function::new_cfunction,
     Context, Runtime,
 };
 
@@ -30,13 +29,13 @@ fn add_global_print(ctx: &Context) {
     let console = ctx.new_object();
 
     console
-        .set_property("log", new_cfunction(ctx, Some(js_print), "log", 1).unwrap())
+        .set_property("log", ctx.get_cfunction(js_print, "log", 1).unwrap())
         .unwrap();
     global_obj.set_property("console", console).unwrap();
     global_obj
         .set_property(
             "print",
-            new_cfunction(ctx, Some(js_print), "log", 1).unwrap(),
+            ctx.get_cfunction(js_print, "log", 1).unwrap(),
         )
         .unwrap();
 }
