@@ -1,4 +1,4 @@
-use std::{fs, mem::size_of};
+use std::fs;
 
 use ez_quick_js::{
     ffi::{js_to_string, JSContext, JSValue, JS_EVAL_TYPE_GLOBAL, JS_UNDEFINED},
@@ -18,16 +18,17 @@ fn main() {
 
     println!("Eval script:");
 
-    let script = ctx
-        .eval(&code, file_name, JS_EVAL_TYPE_GLOBAL as i32).unwrap();
+    let _rst = ctx
+        .eval(&code, file_name, JS_EVAL_TYPE_GLOBAL as i32)
+        .unwrap();
 
-    println!("{:?}", script.tag());
-    // println!("{:?}", script.to_string().unwrap().value());
+    // println!("{:?}", _rst.to_string().unwrap().value());
 }
 
 fn add_global_print(ctx: &Context) {
     let global_obj = ctx.new_global_object();
     let console = ctx.new_object();
+
     console
         .set_property("log", new_cfunction(ctx, Some(js_print), "log", 1).unwrap())
         .unwrap();
@@ -42,24 +43,22 @@ fn add_global_print(ctx: &Context) {
 
 unsafe extern "C" fn js_print(
     ctx: *mut JSContext,
-    this_val: JSValue,
-    argc: i32,
+    _this_val: JSValue,
+    argc: ::std::os::raw::c_int,
     argv: *mut JSValue,
 ) -> JSValue {
-    println!("ppppppp");
+    let args = std::slice::from_raw_parts(argv, argc as usize);
 
-    // let args = Vec::from_raw_parts(argv, argc as usize, size_of::<JSValue>() * argc as usize);
+    for (idx, item) in args.iter().enumerate() {
+        if idx != 0 {
+            print!(" ");
+        }
 
-    // for (idx, item) in args.iter().enumerate() {
-    //     if idx != 0 {
-    //         print!(" ");
-    //     }
+        let str = js_to_string(ctx, *item);
+        print!("{str}");
+    }
 
-    //     let str = js_to_string(ctx, *item);
-    //     print!("{str}");
-    // }
-
-    // println!();
+    println!();
 
     JS_UNDEFINED
 }

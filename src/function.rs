@@ -3,7 +3,7 @@ use std::ffi::c_void;
 use crate::{
     common::{make_cstring, Error},
     ffi::{
-        js_free, js_new_object_with_proto, JS_EvalFunction, JS_GetException, JS_ReadObject, JS_WriteObject, JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE
+        js_free, js_new_object_with_proto, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor, JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionMagic, JS_EvalFunction, JS_GetException, JS_NewCFunction2, JS_ReadObject, JS_WriteObject, JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE
     },
     Context, JsCompiledFunction, JsFunction, JsValue,
 };
@@ -156,42 +156,71 @@ pub fn from_bytecode<'a>(ctx: &'a Context, bytecode: &[u8]) -> Result<JsValue<'a
 
 pub fn new_cfunction<'a>(
     ctx: &'a Context,
-    mut c_func: crate::ffi::JSCFunction,
+    func: JSCFunction,
     name: &str,
-    length: i32,
+    arg_count: i32
+) -> Result<JsValue<'a>, Error> {
+    new_cfunction2(ctx, func, name, arg_count, false)
+}
+
+pub fn new_cfunction2<'a>(
+    ctx: &'a Context,
+    func: JSCFunction,
+    name: &str,
+    arg_count: i32,
+    is_constructor: bool,
+) -> Result<JsValue<'a>, Error> {
+    new_cfunction_magic(ctx, func, name, arg_count, false, 0)
+}
+
+pub fn new_cfunction_magic<'a>(
+    ctx: &'a Context,
+    func: JSCFunction,
+    name: &str,
+    arg_count: i32,
+    is_constructor: bool,
+    magic: i32,
 ) -> Result<JsValue<'a>, Error> {
     let name = make_cstring(name)?;
 
-    let value = unsafe { crate::ffi::js_new_cfunction(
+    let cproto = if is_constructor {
+        JSCFunctionEnum_JS_CFUNC_constructor
+    } else {
+        JSCFunctionEnum_JS_CFUNC_generic
+    };
+
+    let value = unsafe { crate::ffi::JS_NewCFunction2(
         ctx.inner,
-        &mut c_func as *mut _,
+        func,
         name.as_ptr(),
-        length,
+        arg_count,
+        cproto,
+        magic,
     ) };
     
     Ok(JsValue::new(ctx, value))
 }
 
-pub fn new_cfunction_magic<'a>(
-    ctx: &'a Context,
-    mut c_func: crate::ffi::JSCFunctionMagic,
-    name: &str,
-    cproto: crate::ffi::JSCFunctionEnum,
-    magic: i32,
-) -> Result<JsValue<'a>, Error> {
-    let name = make_cstring(name)?;
+// pub fn new_cfunction_magic<'a>(
+//     ctx: &'a Context,
+//     name: &str,
+//     func: JSCFunctionMagic,
+//     cproto: crate::ffi::JSCFunctionEnum,
+//     magic: i32,
+// ) -> Result<JsValue<'a>, Error> {
+//     let name = make_cstring(name)?;
 
-    let value = unsafe { crate::ffi::js_new_cfunction_magic(
-        ctx.inner,
-        &mut c_func as *mut _,
-        name.as_ptr(),
-        name.count_bytes() as i32,
-        cproto,
-        magic,
-    ) };
+//     let value = unsafe { crate::ffi::js_new_cfunction_magic(
+//         ctx.inner,
+//         name.as_ptr(),
+//         func,
+//         name.count_bytes() as i32,
+//         cproto,
+//         magic,
+//     ) };
 
-    Ok(JsValue::new(ctx, value))
-}
+//     Ok(JsValue::new(ctx, value))
+// }
 
 pub fn get_global_object<'a>(ctx: &'a Context) -> JsValue<'a> {
     let val = unsafe { crate::ffi::JS_GetGlobalObject(ctx.inner) };
