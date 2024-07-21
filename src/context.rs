@@ -1,6 +1,7 @@
 use crate::{
-    ffi::{JSContext, JS_FreeContext, JS_FreeRuntime, JS_NewContext},
-    Runtime,
+    ffi::{js_new_object_with_proto, JSContext, JS_FreeContext, JS_FreeRuntime, JS_NewContext},
+    function::{get_global_object, js_eval, new_object_with_proto},
+    JsValue, Runtime,
 };
 
 pub struct Context<'a> {
@@ -16,6 +17,27 @@ impl<'a> Context<'a> {
         }
 
         Self { runtime, inner }
+    }
+
+    pub fn get_runtime(&self) -> &Runtime {
+        &self.runtime
+    }
+
+    pub fn new_global_object(&self) -> JsValue {
+        get_global_object(self)
+    }
+
+    pub fn new_object(&self) -> JsValue {
+        new_object_with_proto(self, None)
+    }
+
+    pub fn eval(
+        &'a self,
+        code: &str,
+        file_name: &str,
+        eval_flags: i32,
+    ) -> Result<JsValue<'a>, crate::common::Error> {
+        js_eval(self, code, file_name, eval_flags)
     }
 }
 

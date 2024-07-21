@@ -3,8 +3,7 @@ use std::ffi::c_void;
 use crate::{
     common::{make_cstring, Error},
     ffi::{
-        js_free, JS_EvalFunction, JS_GetException, JS_ReadObject, JS_WriteObject,
-        JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE,
+        js_free, js_new_object_with_proto, JS_EvalFunction, JS_GetException, JS_ReadObject, JS_WriteObject, JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE
     },
     Context, JsCompiledFunction, JsFunction, JsValue,
 };
@@ -15,9 +14,10 @@ pub fn js_eval<'a>(
     file_name: &str,
     eval_flags: i32,
 ) -> Result<JsValue<'a>, Error> {
-    let len = code.as_bytes().len();
     let code = make_cstring(code)?;
+    let len = code.count_bytes();
     let file_name = make_cstring(file_name)?;
+
     let val = unsafe {
         crate::ffi::JS_Eval(
             ctx.inner,
@@ -29,7 +29,11 @@ pub fn js_eval<'a>(
     };
 
     if unsafe { crate::ffi::js_is_exception(val) } {
-        Err(Error::ExecuteError("JS_Eval() is failed".to_owned()))?
+        if let Some(err) = get_last_exception(ctx) {
+            Err(err)?
+        } else {
+            Err(Error::ExecuteError("JS_Eval() is failed".to_owned()))?
+        }
     }
 
     Ok(JsValue::new(ctx, val))
@@ -154,6 +158,7 @@ pub fn new_cfunction<'a>(
     ctx: &'a Context,
     mut c_func: crate::ffi::JSCFunction,
     name: &str,
+    length: i32,
 ) -> Result<JsValue<'a>, Error> {
     let name = make_cstring(name)?;
 
@@ -161,9 +166,9 @@ pub fn new_cfunction<'a>(
         ctx.inner,
         &mut c_func as *mut _,
         name.as_ptr(),
-        name.count_bytes() as i32,
+        length,
     ) };
-
+    
     Ok(JsValue::new(ctx, value))
 }
 
@@ -186,6 +191,18 @@ pub fn new_cfunction_magic<'a>(
     ) };
 
     Ok(JsValue::new(ctx, value))
+}
+
+pub fn get_global_object<'a>(ctx: &'a Context) -> JsValue<'a> {
+    let val = unsafe { crate::ffi::JS_GetGlobalObject(ctx.inner) };
+    JsValue::new(ctx, val)
+}
+
+pub fn new_object_with_proto<'a>(ctx: &'a Context, proto: Option<JsValue>) -> JsValue<'a> {
+    let proto = proto.map(|val| val.inner);
+    let val = unsafe { js_new_object_with_proto(ctx.inner, proto) };
+    
+    JsValue::new(ctx, val)
 }
 
 #[cfg(test)]

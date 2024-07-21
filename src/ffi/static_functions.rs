@@ -1,11 +1,12 @@
 use std::{
     borrow::Cow,
-    ffi::{c_char, CStr},
+    ffi::{c_char, CStr, CString},
 };
 
 use crate::{ffi::*, JsTag};
 
 pub const NULL_PTR: *mut crate::ffi::JSValue = std::ptr::null_mut();
+pub const NULL_SIZE: *mut usize = std::ptr::null_mut();
 pub const JS_UNDEFINED: crate::ffi::JSValue = JSValue { u: JSValueUnion{ int32: 0 }, tag: JS_TAG_UNDEFINED as i64 };
 
 extern "C" {
@@ -278,7 +279,6 @@ pub fn js_equal(ctx: *mut JSContext, one: &JSValue, other: &JSValue) -> bool {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
