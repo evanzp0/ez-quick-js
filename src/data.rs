@@ -489,6 +489,10 @@ impl<'a> JsValue<'a> {
         Ok(js_fn)
     }
 
+    pub fn is_array(&self) -> bool {
+        unsafe { crate::ffi::JS_IsArray(self.ctx.inner, self.inner) == 1 }
+    }
+
     is_fn!(is_undefined);
     is_fn!(is_object);
     is_fn!(is_exception);
@@ -535,6 +539,26 @@ impl_from!(JsObject for JsValue);
 impl_from!(JsFunction for JsValue);
 impl_from!(JsCompiledFunction for JsValue);
 impl_from!(JsModule for JsValue);
+impl_from!(JsArray for JsValue);
+
+struct_type!(JsArray);
+impl<'a> JsArray<'a> {
+    pub fn new(ctx:&'a crate::Context, value: Opaque) -> Self {
+        let is_array = unsafe { crate::ffi::JS_IsArray(ctx.inner, value) == 1 };
+
+        if is_array {
+            Self {
+                ctx,
+                inner: value,
+            }
+        } else {
+            panic!("Value is not js array");
+        }
+    }
+}
+impl_drop!(JsArray);
+impl_clone!(JsArray);
+impl_try_from!(JsValue for JsArray if v => v.is_array());
 
 struct_type!(JsObject);
 impl_type_common_fn!(
