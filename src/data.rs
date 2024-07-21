@@ -4,13 +4,11 @@ use crate::{
     function::{get_last_exception, run_compiled_function, to_bytecode},
 };
 
-type Opaque = crate::ffi::JSValue;
-
 macro_rules! struct_type {
     ($type:ident) => {
         pub struct $type<'a> {
             pub(crate) ctx: &'a crate::Context<'a>,
-            pub(crate) inner: Opaque,
+            pub(crate) inner: JSValue,
         }
     };
 }
@@ -143,7 +141,7 @@ macro_rules! to_fn {
 
 macro_rules! opaque_fn {
     {} => {
-        pub fn opaque(&self) -> &Opaque {
+        pub fn opaque(&self) -> &JSValue {
             &self.inner
         }
     };
@@ -167,7 +165,7 @@ macro_rules! tag_fn {
 
 macro_rules! forget_fn {
     {} => {
-        pub unsafe fn forget(self) -> Opaque {
+        pub unsafe fn forget(self) -> JSValue {
             let v = self.inner;
             std::mem::forget(self);
             v
@@ -240,7 +238,7 @@ pub enum JsTag {
 
 impl JsTag {
     #[inline]
-    pub fn from_c(value: &Opaque) -> JsTag {
+    pub fn from_c(value: &JSValue) -> JsTag {
         let inner = unsafe { crate::ffi::js_value_get_tag(*value) };
         match inner {
             crate::ffi::JS_TAG_INT => JsTag::Int,
@@ -471,7 +469,7 @@ impl_value_fn!(JsString, js_to_string, std::borrow::Cow<'_, str>);
 
 struct_type!(JsValue);
 impl<'a> JsValue<'a> {
-    pub fn new(ctx: &'a crate::Context, value: Opaque) -> Self {
+    pub fn new(ctx: &'a crate::Context, value: JSValue) -> Self {
         Self { ctx, inner: value }
     }
 
@@ -603,7 +601,7 @@ impl_from!(JsArray for JsValue);
 
 struct_type!(JsArray);
 impl<'a> JsArray<'a> {
-    pub fn new(ctx: &'a crate::Context, value: Opaque) -> Self {
+    pub fn new(ctx: &'a crate::Context, value: JSValue) -> Self {
         let is_array = unsafe { crate::ffi::JS_IsArray(ctx.inner, value) == 1 };
 
         if is_array {
@@ -620,7 +618,7 @@ impl_try_from!(JsValue for JsArray if v => v.is_array());
 struct_type!(JsObject);
 impl_type_common_fn!(
     JsObject,
-    Option<Opaque>,
+    Option<JSValue>,
     crate::ffi::js_new_object_with_proto
 );
 impl<'a> std::fmt::Debug for JsObject<'a> {
@@ -681,7 +679,7 @@ impl<'a> JsObject<'a> {
         unsafe {
             // NOTE: SetPropertyStr takes ownership of the value.
             // We do not, however, call JsValue::forget immediately, so
-            // the inner Opaque is still managed.
+            // the inner JSValue is still managed.
             // `mem::forget` is called below only if SetProperty succeeds.
             // This prevents leaks when an error occurs.
             let ret = crate::ffi::JS_SetPropertyStr(
