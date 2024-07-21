@@ -201,27 +201,6 @@ pub fn new_cfunction_magic<'a>(
     Ok(JsValue::new(ctx, value))
 }
 
-// pub fn new_cfunction_magic<'a>(
-//     ctx: &'a Context,
-//     name: &str,
-//     func: JSCFunctionMagic,
-//     cproto: crate::ffi::JSCFunctionEnum,
-//     magic: i32,
-// ) -> Result<JsValue<'a>, Error> {
-//     let name = make_cstring(name)?;
-
-//     let value = unsafe { crate::ffi::js_new_cfunction_magic(
-//         ctx.inner,
-//         name.as_ptr(),
-//         func,
-//         name.count_bytes() as i32,
-//         cproto,
-//         magic,
-//     ) };
-
-//     Ok(JsValue::new(ctx, value))
-// }
-
 pub fn get_global_object<'a>(ctx: &'a Context) -> JsValue<'a> {
     let val = unsafe { crate::ffi::JS_GetGlobalObject(ctx.inner) };
     JsValue::new(ctx, val)

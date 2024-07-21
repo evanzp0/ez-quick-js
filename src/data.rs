@@ -1,6 +1,6 @@
 use crate::{
     common::{make_cstring, Error},
-    ffi::{js_new_float64, js_new_int32, js_new_string, js_to_f64, js_to_i32},
+    ffi::{js_dup_value, js_free_value, js_new_float64, js_new_int32, js_new_string, js_to_f64, js_to_i32, JSRefCountHeader, JSValue},
     function::{get_last_exception, run_compiled_function, to_bytecode},
 };
 
@@ -489,6 +489,40 @@ impl<'a> JsValue<'a> {
         unsafe { crate::ffi::JS_IsArray(self.ctx.inner, self.inner) == 1 }
     }
 
+    pub fn borrow_value(&self) -> &JSValue {
+        &self.inner
+    }
+
+    pub(crate) fn increment_ref_count(&self) {
+        if self.inner.tag < 0 {
+            unsafe { js_dup_value(self.ctx.inner, self.inner) }
+        }
+    }
+
+    pub(crate) fn decrement_ref_count(&self) {
+        if self.inner.tag < 0 {
+            unsafe { js_free_value(self.ctx.inner, self.inner) }
+        }
+    }
+
+    pub fn get_ref_count(&self) -> i32 {
+        if self.inner.tag < 0 {
+            // This transmute is OK since if tag < 0, the union will be a refcount
+            // pointer.
+            let ptr = unsafe { self.inner.u.ptr as *mut JSRefCountHeader };
+            let pref: &mut JSRefCountHeader = &mut unsafe { *ptr };
+            pref.ref_count
+        } else {
+            -1
+        }
+    }
+
+    /// borrow the value but first increment the refcount, this is useful for when the value is returned or passed to functions
+    pub fn dup_value(&self) -> JSValue {
+        self.increment_ref_count();
+        self.inner
+    }
+
     pub fn set_property(
         &self,
         prop_name: &str,
@@ -499,9 +533,9 @@ impl<'a> JsValue<'a> {
         let val = unsafe { 
             crate::ffi::JS_SetPropertyStr(
                 self.ctx.inner, 
-                self.inner, 
+                self.inner,
                 p_name.as_ptr(),
-                prop_value.inner,
+                prop_value.dup_value(),
             ) 
         };
 
@@ -509,7 +543,7 @@ impl<'a> JsValue<'a> {
             Err(Error::GeneralError(format!("Set property '{}' for object is failed", prop_name)))?;
         }
 
-        unsafe { prop_value.forget() };
+        // unsafe { prop_value.forget() };
 
         Ok(())
     }
