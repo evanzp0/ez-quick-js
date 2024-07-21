@@ -1,12 +1,8 @@
-mod constant;
-
 use crate::{
     common::Error,
     ffi::{js_new_float64, js_new_int32, js_new_string, js_to_f64, js_to_i32},
     function::{get_last_exception, run_compiled_function, to_bytecode},
 };
-
-pub use constant::*;
 
 type Opaque = crate::ffi::JSValue;
 
@@ -798,7 +794,7 @@ mod tests {
         assert!(val.is_none());
 
         let script = "function add(a) { return a + 1; }";
-        let js_val = js_eval(ctx, script, "<input>", EVAL_TYPE_GLOBAL).unwrap();
+        let js_val = js_eval(ctx, script, "<input>", crate::ffi::JS_EVAL_TYPE_GLOBAL as i32).unwrap();
         let global_obj = js_get_global_object(ctx).unwrap().to_object().unwrap();
         let js_fn = global_obj.property("add").unwrap();
         assert!(js_fn.is_function());

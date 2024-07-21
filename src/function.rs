@@ -6,7 +6,7 @@ use crate::{
         js_free, JS_EvalFunction, JS_GetException, JS_ReadObject, JS_WriteObject,
         JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE,
     },
-    Context, JsCompiledFunction, JsFunction, JsValue, EVAL_FLAG_COMPILE_ONLY,
+    Context, JsCompiledFunction, JsFunction, JsValue,
 };
 
 pub fn js_eval<'a>(
@@ -76,7 +76,7 @@ pub fn get_last_exception<'a>(ctx: &Context<'a>) -> Option<Error> {
 /// compile a script, will result in a JSValueRef with tag JS_TAG_FUNCTION_BYTECODE or JS_TAG_MODULE.
 ///  It can be executed with run_compiled_function().
 pub fn compile<'a>(ctx: &'a Context, script: &str, file_name: &str) -> Result<JsValue<'a>, Error> {
-    js_eval(ctx, script, file_name, EVAL_FLAG_COMPILE_ONLY)
+    js_eval(ctx, script, file_name, crate::ffi::JS_EVAL_FLAG_COMPILE_ONLY as i32)
 }
 
 /// run a compiled function, see compile for an example
