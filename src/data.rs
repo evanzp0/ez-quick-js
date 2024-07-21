@@ -514,8 +514,13 @@ impl<'a> JsValue<'a> {
     to_fn!(to_string, JsString, JsTag::String, is_string);
     to_fn!(to_object, JsObject, JsTag::Object, is_object);
     to_fn!(to_module, JsModule, JsTag::Module, is_module);
-    to_fn!(to_compiled_function, JsCompiledFunction, JsTag::FunctionBytecode, is_compiled_function);
-    
+    to_fn!(
+        to_compiled_function,
+        JsCompiledFunction,
+        JsTag::FunctionBytecode,
+        is_compiled_function
+    );
+
     opaque_fn!();
     context_fn!();
     tag_fn!();
@@ -543,14 +548,11 @@ impl_from!(JsArray for JsValue);
 
 struct_type!(JsArray);
 impl<'a> JsArray<'a> {
-    pub fn new(ctx:&'a crate::Context, value: Opaque) -> Self {
+    pub fn new(ctx: &'a crate::Context, value: Opaque) -> Self {
         let is_array = unsafe { crate::ffi::JS_IsArray(ctx.inner, value) == 1 };
 
         if is_array {
-            Self {
-                ctx,
-                inner: value,
-            }
+            Self { ctx, inner: value }
         } else {
             panic!("Value is not js array");
         }
@@ -709,6 +711,30 @@ impl<'a> JsModule<'a> {
 impl_try_from!(JsValue for JsModule if v => v.is_module());
 impl_drop!(JsModule);
 impl_clone!(JsModule);
+
+// pub type NativeFunction<'a> = fn(
+//     ctx: &'a crate::Context,
+//     this_val: JsValue,
+//     // argc: i32,
+//     argv: &'a [JsValue],
+// ) -> JsValue<'a>;
+
+// pub type NativeFunctionMagic<'a> = fn(
+//     ctx: &'a crate::Context,
+//     this_val: JsValue,
+//     // argc: i32,
+//     argv: &'a [JsValue],
+//     magic: i32,
+// ) -> JsValue<'a>;
+
+// pub type NativeFunctionData<'a> = fn(
+//     ctx: &'a crate::Context,
+//     this_val: JsValue,
+//     // argc: i32,
+//     argv: &'a [JsValue],
+//     magic: i32,
+//     func_data: &'a [JsValue],
+// ) -> JsValue<'a>;
 
 #[cfg(test)]
 mod tests {

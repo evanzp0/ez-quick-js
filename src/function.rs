@@ -95,7 +95,9 @@ pub fn run_compiled_function<'a>(func: &'a JsCompiledFunction) -> Result<JsValue
         if let Some(err) = get_last_exception(ctx) {
             Err(err)?
         } else {
-            Err(Error::GeneralError("Could not evaluate compiled function".to_owned()))?
+            Err(Error::GeneralError(
+                "Could not evaluate compiled function".to_owned(),
+            ))?
         }
     }
 
@@ -148,6 +150,44 @@ pub fn from_bytecode<'a>(ctx: &'a Context, bytecode: &[u8]) -> Result<JsValue<'a
     }
 }
 
+pub fn new_cfunction<'a>(
+    ctx: &'a Context,
+    mut c_func: crate::ffi::JSCFunction,
+    name: &str,
+) -> Result<JsValue<'a>, Error> {
+    let name = make_cstring(name)?;
+
+    let value = unsafe { crate::ffi::js_new_cfunction(
+        ctx.inner,
+        &mut c_func as *mut _,
+        name.as_ptr(),
+        name.count_bytes() as i32,
+    ) };
+
+    Ok(JsValue::new(ctx, value))
+}
+
+pub fn new_cfunction_magic<'a>(
+    ctx: &'a Context,
+    mut c_func: crate::ffi::JSCFunctionMagic,
+    name: &str,
+    cproto: crate::ffi::JSCFunctionEnum,
+    magic: i32,
+) -> Result<JsValue<'a>, Error> {
+    let name = make_cstring(name)?;
+
+    let value = unsafe { crate::ffi::js_new_cfunction_magic(
+        ctx.inner,
+        &mut c_func as *mut _,
+        name.as_ptr(),
+        name.count_bytes() as i32,
+        cproto,
+        magic,
+    ) };
+
+    Ok(JsValue::new(ctx, value))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{JsInteger, Runtime};
@@ -158,14 +198,19 @@ mod tests {
     fn test_compile_and_run() {
         let rt = Runtime::default();
         let ctx = &Context::new(&rt);
-        
+
         let script = "{let a = 7; let b = 5; a * b;}";
-        let js_compiled_val: JsCompiledFunction = compile(ctx, script, "<test>").unwrap().try_into().unwrap();
+        let js_compiled_val: JsCompiledFunction =
+            compile(ctx, script, "<test>").unwrap().try_into().unwrap();
         let bytes = to_bytecode(ctx, &js_compiled_val);
-        let js_compiled_val: JsCompiledFunction = from_bytecode(ctx, &bytes).unwrap().try_into().unwrap();
+        let js_compiled_val: JsCompiledFunction =
+            from_bytecode(ctx, &bytes).unwrap().try_into().unwrap();
         println!("{:?}", js_compiled_val.clone().to_value().tag());
 
-        let rst: JsInteger = run_compiled_function(&js_compiled_val).unwrap().try_into().unwrap();
+        let rst: JsInteger = run_compiled_function(&js_compiled_val)
+            .unwrap()
+            .try_into()
+            .unwrap();
         assert_eq!(rst.value(), 7 * 5);
     }
 }
