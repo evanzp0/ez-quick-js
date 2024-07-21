@@ -24,7 +24,7 @@ macro_rules! impl_type_common_fn {
             }
 
             to_value_fn!();
-            opaque_fn!();
+            raw_value_fn!();
             context_fn!();
             tag_fn!();
             forget_fn!();
@@ -139,9 +139,9 @@ macro_rules! to_fn {
     };
 }
 
-macro_rules! opaque_fn {
+macro_rules! raw_value_fn {
     {} => {
-        pub fn opaque(&self) -> &JSValue {
+        pub fn raw_value(&self) -> &JSValue {
             &self.inner
         }
     };
@@ -158,7 +158,7 @@ macro_rules! context_fn {
 macro_rules! tag_fn {
     {} => {
         pub fn tag(&self) -> JsTag {
-            JsTag::from_c(self.opaque())
+            JsTag::from_c(self.raw_value())
         }
     };
 }
@@ -201,8 +201,8 @@ macro_rules! impl_partial_eq {
     { $rhs:ident for $type:ident } => {
         impl<'s> PartialEq<$rhs<'s>> for $type<'s> {
             fn eq(&self, other: &$rhs) -> bool {
-                let a = self.opaque();
-                let b = other.opaque();
+                let a = self.raw_value();
+                let b = other.raw_value();
                 unsafe { crate::ffi::js_equal(self.context().inner, a, b) }
             }
         }
@@ -574,7 +574,7 @@ impl<'a> JsValue<'a> {
         is_compiled_function
     );
 
-    opaque_fn!();
+    raw_value_fn!();
     context_fn!();
     tag_fn!();
     forget_fn!();
@@ -624,7 +624,7 @@ impl_type_common_fn!(
 impl<'a> std::fmt::Debug for JsObject<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("JsObject")
-            .field(&self.opaque().tag)
+            .field(&self.raw_value().tag)
             .field(&"...")
             .finish()
     }
