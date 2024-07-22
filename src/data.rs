@@ -2,7 +2,7 @@ use crate::{
     common::{make_cstring, Error},
     ffi::{
         js_dup_value, js_free_value, js_new_float64, js_new_int32, js_new_string, js_to_f64,
-        js_to_i32, JSContext, JSRefCountHeader, JSValue,
+        js_to_i32, JSContext, JSRefCountHeader, JSValue, JS_ATOM_NULL,
     },
     function::{get_last_exception, run_compiled_function, to_bytecode},
 };
@@ -10,7 +10,7 @@ use crate::{
 macro_rules! struct_type {
     ($type:ident) => {
         pub struct $type<'a> {
-            pub(crate) ctx: &'a crate::Context<'a>,
+            pub(crate) ctx: &'a crate::Context,
             pub(crate) inner: JSValue,
         }
     };
@@ -391,7 +391,7 @@ impl JsTag {
 }
 
 pub struct JsAtom<'a> {
-    pub(crate) ctx: &'a crate::Context<'a>,
+    pub(crate) ctx: &'a crate::Context,
     pub(crate) inner: crate::ffi::JSAtom,
 }
 
@@ -399,6 +399,10 @@ impl<'a> JsAtom<'a> {
     #[inline]
     pub fn new(ctx: &'a crate::Context, value: crate::ffi::JSAtom) -> Self {
         Self { ctx, inner: value }
+    }
+
+    pub fn is_exception(&self) -> bool {
+        self.inner == JS_ATOM_NULL
     }
 }
 
@@ -553,6 +557,37 @@ impl<'a> JsValue<'a> {
         // unsafe { prop_value.forget() };
 
         Ok(())
+    }
+
+    pub fn get_property(&self, prop_name: &str) -> Option<JsValue> {
+        let p_name = {
+            if let Ok(val) = make_cstring(prop_name) {
+                val
+            } else {
+                return None;
+            }
+        };
+
+        let val =
+            unsafe { crate::ffi::JS_GetPropertyStr(self.ctx.inner, self.inner, p_name.as_ptr()) };
+
+        let val = JsValue::new(self.ctx, val);
+
+        if val.is_exception() || val.is_undefined() {
+            None
+        } else {
+            Some(val)
+        }
+    }
+
+    pub fn define_property(
+        &self,
+        prop_name: &str,
+        prop_value: JsValue,
+        flags: i32,
+    ) -> Result<(), Error> {
+        let prop_name = self.ctx.new_atom(prop_name)?;
+        crate::function::define_property(self.ctx, self, prop_name, prop_value, flags)
     }
 
     is_fn!(is_undefined);
@@ -811,7 +846,7 @@ mod tests {
     #[test]
     fn test_data() {
         let rt = Runtime::default();
-        let ctx = &Context::new(&rt);
+        let ctx = &Context::new(rt);
 
         let val_1 = JsInteger::new(ctx, 2);
         let val_2 = JsInteger::new(ctx, 2);

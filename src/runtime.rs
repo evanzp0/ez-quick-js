@@ -1,4 +1,7 @@
-use crate::{ffi::{JSRuntime, JS_FreeRuntime, JS_NewRuntime, JS_SetMemoryLimit}, Context};
+use crate::{
+    ffi::{JSRuntime, JS_FreeRuntime, JS_NewRuntime, JS_SetMemoryLimit},
+    Context,
+};
 
 pub struct Runtime {
     pub(crate) inner: *mut JSRuntime,
@@ -20,8 +23,12 @@ impl Runtime {
         Self { inner }
     }
 
-    pub fn create_context(&self) -> Context {
-        Context::new(&self)
+    pub fn from_raw(js_runtime: *mut JSRuntime) -> Self {
+        Self { inner: js_runtime }
+    }
+
+    pub fn create_context(self) -> Context {
+        Context::new(self)
     }
 }
 

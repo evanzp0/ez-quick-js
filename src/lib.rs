@@ -17,8 +17,9 @@ mod data;
 pub mod ffi;
 pub mod function;
 mod runtime;
+mod safe_ref;
 
 pub use context::*;
 pub use data::*;
 pub use runtime::*;
-
+pub use safe_ref::*;

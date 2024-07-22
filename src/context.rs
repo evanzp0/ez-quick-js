@@ -2,19 +2,19 @@ use crate::{
     common::Error,
     ffi::{
         js_new_object_with_proto, JSCFunction, JSContext, JS_FreeContext, JS_FreeRuntime,
-        JS_NewContext,
+        JS_GetRuntime, JS_NewContext,
     },
-    function::{get_global_object, js_eval, new_cfunction, new_object_with_proto},
-    CFunctionInner, JsBoolean, JsInteger, JsNumber, JsString, JsValue, Runtime,
+    function::{get_global_object, js_eval, new_atom, new_cfunction, new_object_with_proto},
+    CFunctionInner, JsAtom, JsBoolean, JsInteger, JsNumber, JsString, JsValue, Runtime,
 };
 
-pub struct Context<'a> {
-    runtime: &'a Runtime,
+pub struct Context {
+    runtime: Runtime,
     pub inner: *mut JSContext,
 }
 
-impl<'a> Context<'a> {
-    pub fn new(runtime: &'a Runtime) -> Self {
+impl Context {
+    pub fn new(runtime: Runtime) -> Self {
         let inner = unsafe { JS_NewContext(runtime.inner) };
         if inner.is_null() {
             panic!("Context create failed");
@@ -23,19 +23,35 @@ impl<'a> Context<'a> {
         Self { runtime, inner }
     }
 
+    pub fn from_raw(js_ctx: *mut JSContext) -> Self {
+        let runtime = {
+            let rt = unsafe { JS_GetRuntime(js_ctx) };
+            Runtime::from_raw(rt)
+        };
+
+        Self {
+            runtime,
+            inner: js_ctx,
+        }
+    }
+
     pub fn get_runtime(&self) -> &Runtime {
         &self.runtime
     }
 
-    pub fn new_global_object(&self) -> JsValue {
+    pub fn get_global_object(&self) -> JsValue {
         get_global_object(self)
     }
 
-    pub fn new_object(&self) -> JsValue {
+    pub fn new_object(&self) -> Result<JsValue, Error> {
         new_object_with_proto(self, None)
     }
 
-    pub fn eval(
+    pub fn new_atom(&self, name: &str) -> Result<JsAtom, Error> {
+        new_atom(self, name)
+    }
+
+    pub fn eval<'a>(
         &'a self,
         code: &str,
         file_name: &str,
@@ -70,7 +86,7 @@ impl<'a> Context<'a> {
     }
 }
 
-impl Drop for Context<'_> {
+impl Drop for Context {
     fn drop(&mut self) {
         unsafe { JS_FreeContext(self.inner) }
     }

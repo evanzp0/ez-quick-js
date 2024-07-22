@@ -4,11 +4,11 @@ use crate::{
     common::{make_cstring, Error},
     ffi::{
         js_free, js_new_object_with_proto, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor,
-        JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionMagic, JSContext, JSValue, JS_EvalFunction,
-        JS_GetException, JS_NewCFunction2, JS_ReadObject, JS_WriteObject, JS_READ_OBJ_BYTECODE,
-        JS_WRITE_OBJ_BYTECODE,
+        JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionMagic, JSContext, JSValue,
+        JS_DefinePropertyValue, JS_EvalFunction, JS_GetException, JS_NewAtomLen, JS_NewCFunction2,
+        JS_ReadObject, JS_WriteObject, JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE,
     },
-    Context, JsCompiledFunction, JsFunction, JsValue,
+    Context, JsAtom, JsCompiledFunction, JsFunction, JsValue,
 };
 
 pub fn js_eval<'a>(
@@ -31,29 +31,22 @@ pub fn js_eval<'a>(
         )
     };
 
-    if unsafe { crate::ffi::js_is_exception(val) } {
-        if let Some(err) = get_last_exception(ctx) {
-            Err(err)?
-        } else {
-            Err(Error::ExecuteError("JS_Eval() is failed".to_owned()))?
-        }
-    }
+    let val = JsValue::new(ctx, val);
+    assert_exception(ctx, &val, "JS_Eval() is failed")?;
 
-    Ok(JsValue::new(ctx, val))
+    Ok(val)
 }
 
 pub fn js_get_global_object<'a>(ctx: &'a Context) -> Result<JsValue<'a>, Error> {
     let val = unsafe { crate::ffi::JS_GetGlobalObject(ctx.inner) };
     let val = JsValue::new(ctx, val);
-    if val.is_exception() {
-        Err(Error::GeneralError("Can't get global object".to_owned()))?
-    }
+    assert_exception(ctx, &val, "Can't get global object")?;
 
     Ok(val)
 }
 
 /// Get the last exception from the runtime, and if present, convert it to a Error.
-pub fn get_last_exception<'a>(ctx: &Context<'a>) -> Option<Error> {
+pub fn get_last_exception<'a>(ctx: &Context) -> Option<Error> {
     let value = unsafe {
         let raw = JS_GetException(ctx.inner);
         JsValue::new(ctx, raw)
@@ -103,17 +96,10 @@ pub fn run_compiled_function<'a>(func: &'a JsCompiledFunction) -> Result<JsValue
         v
     };
 
-    if unsafe { crate::ffi::js_is_exception(val) } {
-        if let Some(err) = get_last_exception(ctx) {
-            Err(err)?
-        } else {
-            Err(Error::GeneralError(
-                "Could not evaluate compiled function".to_owned(),
-            ))?
-        }
-    }
+    let val = JsValue::new(ctx, val);
+    assert_exception(ctx, &val, "Could not evaluate compiled function")?;
 
-    Ok(JsValue::new(ctx, val))
+    Ok(val)
 }
 
 /// write a function to bytecode
@@ -147,19 +133,13 @@ pub fn from_bytecode<'a>(ctx: &'a Context, bytecode: &[u8]) -> Result<JsValue<'a
     let raw = unsafe { JS_ReadObject(ctx.inner, buf, len as _, JS_READ_OBJ_BYTECODE as i32) };
 
     let func = JsValue::new(ctx, raw);
-    if func.is_exception() {
-        let rst = get_last_exception(ctx);
+    assert_exception(
+        ctx,
+        &func,
+        "from_bytecode() failed and could not get exception",
+    )?;
 
-        if let Some(err) = rst {
-            Err(err)?
-        } else {
-            Err(Error::GeneralError(
-                "from_bytecode() failed and could not get exception".to_string(),
-            ))?
-        }
-    } else {
-        Ok(func)
-    }
+    Ok(func)
 }
 
 pub fn new_cfunction<'a>(
@@ -209,11 +189,78 @@ pub fn get_global_object<'a>(ctx: &'a Context) -> JsValue<'a> {
     JsValue::new(ctx, val)
 }
 
-pub fn new_object_with_proto<'a>(ctx: &'a Context, proto: Option<JsValue>) -> JsValue<'a> {
+pub fn new_object_with_proto<'a>(
+    ctx: &'a Context,
+    proto: Option<JsValue>,
+) -> Result<JsValue<'a>, Error> {
     let proto = proto.map(|val| val.inner);
     let val = unsafe { js_new_object_with_proto(ctx.inner, proto) };
 
-    JsValue::new(ctx, val)
+    let val = JsValue::new(ctx, val);
+    assert_exception(
+        ctx,
+        &val,
+        "new_object_with_proto() failed and could not get exception",
+    )?;
+
+    Ok(val)
+}
+
+pub fn new_atom<'a>(ctx: &'a Context, name: &str) -> Result<JsAtom<'a>, Error> {
+    let name = make_cstring(name)?;
+
+    let atom = unsafe { JS_NewAtomLen(ctx.inner, name.as_ptr(), name.count_bytes()) };
+    let atom = JsAtom::new(ctx, atom);
+    if atom.is_exception() {
+        if let Some(err) = get_last_exception(ctx) {
+            Err(err)?
+        } else {
+            Err(Error::GeneralError("New atom failed".to_string()))?
+        }
+    }
+
+    Ok(atom)
+}
+
+pub fn define_property(
+    ctx: &Context,
+    this_obj: &JsValue,
+    prop_name: JsAtom,
+    prop_value: JsValue,
+    flags: i32,
+) -> Result<(), Error> {
+    let val = unsafe {
+        JS_DefinePropertyValue(
+            ctx.inner,
+            this_obj.inner,
+            prop_name.inner,
+            prop_value.inner,
+            flags,
+        )
+    };
+
+    if val == -1 {
+        if let Some(err) = get_last_exception(ctx) {
+            Err(err)?
+        } else {
+            Err(Error::GeneralError(
+                "define_property() is failed".to_string(),
+            ))?
+        }
+    }
+
+    Ok(())
+}
+
+pub fn assert_exception(ctx: &Context, val: &JsValue, err_msg: &str) -> Result<(), Error> {
+    Ok(if val.is_exception() {
+        let rst = get_last_exception(ctx);
+        if let Some(err) = rst {
+            Err(err)?
+        } else {
+            Err(Error::GeneralError(err_msg.to_string()))?
+        }
+    })
 }
 
 #[cfg(test)]
@@ -225,7 +272,7 @@ mod tests {
     #[test]
     fn test_compile_and_run() {
         let rt = Runtime::default();
-        let ctx = &Context::new(&rt);
+        let ctx = &Context::new(rt);
 
         let script = "{let a = 7; let b = 5; a * b;}";
         let js_compiled_val: JsCompiledFunction =

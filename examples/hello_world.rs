@@ -10,8 +10,7 @@ fn main() {
     let code = fs::read_to_string(file_name).unwrap();
     println!("{file_name}:\n{code}\n------------");
 
-    let rt = Runtime::new(None);
-    let ctx = &rt.create_context();
+    let ctx = &Runtime::new(None).create_context();
 
     add_global_print(ctx);
 
@@ -25,8 +24,8 @@ fn main() {
 }
 
 fn add_global_print(ctx: &Context) {
-    let global_obj = ctx.new_global_object();
-    let console = ctx.new_object();
+    let global_obj = ctx.get_global_object();
+    let console = ctx.new_object().unwrap();
 
     console
         .set_property("log", ctx.get_cfunction(js_print, "log", 1).unwrap())

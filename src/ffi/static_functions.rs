@@ -257,7 +257,7 @@ mod tests {
     fn test_to_fn() {
         unsafe {
             let rt = Runtime::new(None);
-            let ctx = &Context::new(&rt);
+            let ctx = &Context::new(rt);
             let js_int = JsInteger::new(ctx, 12);
             let js_val = js_int.to_value();
             let mut ret_val = 0_u32;
