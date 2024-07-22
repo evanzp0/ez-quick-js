@@ -340,11 +340,11 @@ impl JsTag {
         matches!(self, Self::Null)
     }
 
-    /// Returns `true` if the js_tag is [`Module`].
-    #[inline]
-    pub fn is_module(&self) -> bool {
-        matches!(self, Self::Module)
-    }
+    // /// Returns `true` if the js_tag is [`Module`].
+    // #[inline]
+    // pub fn is_module(&self) -> bool {
+    //     matches!(self, Self::Module)
+    // }
 
     /// Returns `true` if the js_tag is [`String`].
     #[inline]
@@ -387,6 +387,21 @@ impl JsTag {
     #[inline]
     pub fn is_compiled_function(&self) -> bool {
         matches!(self, Self::FunctionBytecode)
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct JsModuleDef {
+    pub(crate) inner: *mut crate::ffi::JSModuleDef,
+}
+
+impl JsModuleDef {
+    pub fn new(inner: *mut crate::ffi::JSModuleDef) -> Self {
+        Self { inner }
+    }
+
+    pub fn raw_value(&self) -> *mut crate::ffi::JSModuleDef {
+        self.inner
     }
 }
 
@@ -598,7 +613,7 @@ impl<'a> JsValue<'a> {
     is_fn!(is_number);
     is_fn!(is_bool);
     is_fn!(is_null);
-    is_fn!(is_module);
+    // is_fn!(is_module);
     is_fn!(is_string);
     is_fn!(is_symbol);
     is_fn!(is_float64);
@@ -611,7 +626,7 @@ impl<'a> JsValue<'a> {
     to_fn!(to_bool, JsBoolean, JsTag::Bool, is_bool);
     to_fn!(to_string, JsString, JsTag::String, is_string);
     to_fn!(to_object, JsObject, JsTag::Object, is_object);
-    to_fn!(to_module, JsModule, JsTag::Module, is_module);
+    // to_fn!(to_module, JsModule, JsTag::Module, is_module);
     to_fn!(
         to_compiled_function,
         JsCompiledFunction,
@@ -641,7 +656,7 @@ impl_from!(JsString for JsValue);
 impl_from!(JsObject for JsValue);
 impl_from!(JsFunction for JsValue);
 impl_from!(JsCompiledFunction for JsValue);
-impl_from!(JsModule for JsValue);
+// impl_from!(JsModule for JsValue);
 impl_from!(JsArray for JsValue);
 
 struct_type!(JsArray);
@@ -802,13 +817,13 @@ impl_try_from!(JsValue for JsCompiledFunction if v => v.is_compiled_function());
 impl_drop!(JsCompiledFunction);
 impl_clone!(JsCompiledFunction);
 
-struct_type!(JsModule);
-impl<'a> JsModule<'a> {
-    to_value_fn!();
-}
-impl_try_from!(JsValue for JsModule if v => v.is_module());
-impl_drop!(JsModule);
-impl_clone!(JsModule);
+// struct_type!(JsModule);
+// impl<'a> JsModule<'a> {
+//     to_value_fn!();
+// }
+// impl_try_from!(JsValue for JsModule if v => v.is_module());
+// impl_drop!(JsModule);
+// impl_clone!(JsModule);
 
 // pub type NativeFunction<'a> = fn(
 //     ctx: &'a crate::Context,

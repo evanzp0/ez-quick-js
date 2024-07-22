@@ -1,11 +1,14 @@
 use crate::{
     common::Error,
     ffi::{
-        js_new_object_with_proto, JSCFunction, JSContext, JS_FreeContext, JS_FreeRuntime,
-        JS_GetRuntime, JS_NewContext, JS_UNDEFINED,
+        js_new_object_with_proto, JSCFunction, JSContext, JSModuleInitFunc, JS_FreeContext,
+        JS_FreeRuntime, JS_GetRuntime, JS_NewContext, JS_UNDEFINED,
     },
-    function::{get_global_object, js_eval, new_atom, new_cfunction, new_object_with_proto},
-    CFunctionInner, JsAtom, JsBoolean, JsInteger, JsNumber, JsString, JsValue, Runtime,
+    function::{
+        get_global_object, js_eval, new_atom, new_c_function, new_c_module, new_object_with_proto,
+    },
+    CFunctionInner, JsAtom, JsBoolean, JsInteger, JsModuleDef, JsNumber, JsString, JsValue,
+    Runtime,
 };
 
 pub struct Context {
@@ -21,6 +24,14 @@ impl Context {
         }
 
         Self { runtime, inner }
+    }
+
+    pub fn new_module(
+        &self,
+        module_name: &str,
+        module_init_func: JSModuleInitFunc,
+    ) -> Result<JsModuleDef, Error> {
+        new_c_module(self, module_name, module_init_func)
     }
 
     pub fn from_raw(js_ctx: *mut JSContext) -> Self {
@@ -92,7 +103,7 @@ impl Context {
         name: &str,
         arg_count: i32,
     ) -> Result<JsValue, Error> {
-        new_cfunction(self, Some(c_func), name, arg_count)
+        new_c_function(self, Some(c_func), name, arg_count)
     }
 }
 

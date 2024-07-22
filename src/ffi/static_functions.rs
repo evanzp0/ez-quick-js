@@ -5,7 +5,7 @@ use std::{
 
 use crate::{ffi::*, JsTag};
 
-pub const NULL_PTR: *mut crate::ffi::JSValue = std::ptr::null_mut();
+pub const JS_NULL_PTR: *mut crate::ffi::JSValue = std::ptr::null_mut();
 pub const NULL_SIZE: *mut usize = std::ptr::null_mut();
 pub const JS_UNDEFINED: crate::ffi::JSValue = JSValue {
     u: JSValueUnion { int32: 0 },

@@ -15,6 +15,7 @@ pub mod common;
 mod context;
 mod data;
 pub mod ffi;
+#[macro_use]
 pub mod function;
 mod runtime;
 
