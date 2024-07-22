@@ -8,7 +8,12 @@ use std::{
 use crate::{
     common::{make_cstring, Error},
     ffi::{
-        js_free, js_new_object_with_proto, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor, JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionListEntry, JSCFunctionMagic, JSContext, JSModuleDef, JSModuleInitFunc, JSValue, JS_AddModuleExport, JS_Call, JS_DefinePropertyValue, JS_EvalFunction, JS_GetException, JS_NewAtomLen, JS_NewCFunction2, JS_NewCModule, JS_ReadObject, JS_SetModuleExportList, JS_WriteObject, JS_NULL_PTR, JS_READ_OBJ_BYTECODE, JS_UNDEFINED, JS_WRITE_OBJ_BYTECODE
+        js_free, js_new_object_with_proto, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor,
+        JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionListEntry, JSCFunctionMagic, JSContext,
+        JSModuleDef, JSModuleInitFunc, JSValue, JS_AddModuleExport, JS_Call,
+        JS_DefinePropertyValue, JS_EvalFunction, JS_GetException, JS_NewAtomLen, JS_NewCFunction2,
+        JS_NewCModule, JS_ReadObject, JS_SetModuleExportList, JS_WriteObject, JS_NULL_PTR,
+        JS_READ_OBJ_BYTECODE, JS_UNDEFINED, JS_WRITE_OBJ_BYTECODE,
     },
     Context, JsAtom, JsCompiledFunction, JsFunction, JsModuleDef, JsValue,
 };
