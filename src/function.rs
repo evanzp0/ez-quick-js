@@ -1,12 +1,9 @@
-use std::ffi::c_void;
+use std::{f32::consts, ffi::c_void};
 
 use crate::{
     common::{make_cstring, Error},
     ffi::{
-        js_free, js_new_object_with_proto, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor,
-        JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionMagic, JSContext, JSValue,
-        JS_DefinePropertyValue, JS_EvalFunction, JS_GetException, JS_NewAtomLen, JS_NewCFunction2,
-        JS_ReadObject, JS_WriteObject, JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE,
+        js_free, js_new_object_with_proto, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor, JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionMagic, JSContext, JSValue, JS_Call, JS_DefinePropertyValue, JS_EvalFunction, JS_GetException, JS_NewAtomLen, JS_NewCFunction2, JS_ReadObject, JS_WriteObject, JS_READ_OBJ_BYTECODE, JS_UNDEFINED, JS_WRITE_OBJ_BYTECODE, NULL_PTR
     },
     Context, JsAtom, JsCompiledFunction, JsFunction, JsValue,
 };
@@ -261,6 +258,36 @@ pub fn assert_exception(ctx: &Context, val: &JsValue, err_msg: &str) -> Result<(
             Err(Error::GeneralError(err_msg.to_string()))?
         }
     })
+}
+
+pub fn call_function<'a>(
+    ctx: &'a Context,
+    func: &JsValue,
+    this_obj: Option<&JsValue>,
+    argv: &[&JsValue],
+) -> Result<JsValue<'a>, Error> {
+    let argc = argv.len() as i32;
+    let this_val = if let Some(val) = this_obj {
+        val.inner
+    } else {
+        JS_UNDEFINED
+    };
+    
+    let mut qargs = argv
+        .iter()
+        .map(|a| a.inner)
+        .collect::<Vec<_>>();
+    // let qargs = {
+    //     let ptr = &mut ctx.get_int(12).inner;
+    //     let ptr = ptr as *mut JSValue;
+    //     ptr
+    // };
+    
+    let val = unsafe { JS_Call(ctx.inner, func.inner, this_val, argc, qargs.as_mut_ptr()) };
+    let val = JsValue::new(ctx, val);
+    assert_exception(ctx, &val, "call_function() is failed")?;
+
+    Ok(val)
 }
 
 #[cfg(test)]

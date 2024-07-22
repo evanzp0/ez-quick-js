@@ -2,7 +2,7 @@ use crate::{
     common::Error,
     ffi::{
         js_new_object_with_proto, JSCFunction, JSContext, JS_FreeContext, JS_FreeRuntime,
-        JS_GetRuntime, JS_NewContext,
+        JS_GetRuntime, JS_NewContext, JS_UNDEFINED,
     },
     function::{get_global_object, js_eval, new_atom, new_cfunction, new_object_with_proto},
     CFunctionInner, JsAtom, JsBoolean, JsInteger, JsNumber, JsString, JsValue, Runtime,
@@ -33,6 +33,12 @@ impl Context {
             runtime,
             inner: js_ctx,
         }
+    }
+
+    pub unsafe fn forget(self) -> *mut JSContext {
+        let v = self.inner;
+        std::mem::forget(self);
+        v
     }
 
     pub fn get_runtime(&self) -> &Runtime {
@@ -74,6 +80,10 @@ impl Context {
 
     pub fn get_bool(&self, val: bool) -> JsValue {
         JsBoolean::new(self, val).into()
+    }
+
+    pub fn get_undefined(&self) -> JsValue {
+        JsValue::new(self, JS_UNDEFINED)
     }
 
     pub fn get_cfunction(

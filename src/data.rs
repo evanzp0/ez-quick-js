@@ -544,6 +544,7 @@ impl<'a> JsValue<'a> {
                 self.inner,
                 p_name.as_ptr(),
                 prop_value.dup_value(),
+                // prop_value.inner,
             )
         };
 
