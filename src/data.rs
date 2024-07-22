@@ -1,17 +1,28 @@
+use std::ffi::c_void;
+
 use crate::{
     common::{make_cstring, Error},
     ffi::{
         js_dup_value, js_free_value, js_new_float64, js_new_int32, js_new_string, js_to_f64,
-        js_to_i32, JSContext, JSRefCountHeader, JSValue, JS_ATOM_NULL,
+        js_to_i32, JSContext, JSRefCountHeader, JSValue, JSValueUnion, JS_ATOM_NULL, JS_TAG_NULL,
+        JS_TAG_UNDEFINED,
     },
     function::{get_last_exception, run_compiled_function, to_bytecode},
+};
+
+pub const JS_NULL: JSValue = JS_MKVAL(JS_TAG_NULL, 0);
+pub const JS_NULL_PTR: *mut crate::ffi::JSValue = std::ptr::null_mut();
+pub const NULL_SIZE: *mut usize = std::ptr::null_mut();
+pub const JS_UNDEFINED: crate::ffi::JSValue = JSValue {
+    u: JSValueUnion { int32: 0 },
+    tag: JS_TAG_UNDEFINED as i64,
 };
 
 macro_rules! struct_type {
     ($type:ident) => {
         pub struct $type<'a> {
             pub(crate) ctx: &'a crate::Context,
-            pub(crate) inner: JSValue,
+            pub inner: JSValue,
         }
     };
 }
@@ -387,6 +398,20 @@ impl JsTag {
     #[inline]
     pub fn is_compiled_function(&self) -> bool {
         matches!(self, Self::FunctionBytecode)
+    }
+}
+
+pub const fn JS_MKVAL(tag: i32, val: i32) -> JSValue {
+    JSValue {
+        u: JSValueUnion { int32: val },
+        tag: tag as _,
+    }
+}
+
+pub fn JS_MKPTR(tag: i32, ptr: *mut c_void) -> JSValue {
+    JSValue {
+        u: JSValueUnion { ptr },
+        tag: tag as _,
     }
 }
 
@@ -772,7 +797,7 @@ impl<'a> JsFunction<'a> {
             crate::ffi::JS_Call(
                 self.ctx.inner,
                 self.inner,
-                crate::ffi::JS_UNDEFINED,
+                JS_UNDEFINED,
                 len,
                 qargs.as_mut_ptr(),
             )

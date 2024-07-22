@@ -1,9 +1,9 @@
 use std::fs;
 
 use ez_quick_js::{
-    ffi::{js_to_string, JSContext, JSValue, JS_EVAL_TYPE_GLOBAL, JS_PROP_C_W_E, JS_UNDEFINED},
+    ffi::{js_to_string, JSContext, JSValue, JS_EVAL_TYPE_GLOBAL, JS_PROP_C_W_E},
     function::call_function,
-    Context, JsValue, Runtime,
+    Context, JsValue, Runtime, JS_UNDEFINED,
 };
 
 fn main() {

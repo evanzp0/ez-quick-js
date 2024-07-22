@@ -1,10 +1,11 @@
 use std::fs;
 
 use anyhow::Error;
-use ez_quick_js::c_func_def;
+use ez_quick_js::function::C_FUNC_DEF;
+use ez_quick_js::JS_UNDEFINED;
 use ez_quick_js::ffi::{JS_EVAL_TYPE_GLOBAL, JS_EVAL_TYPE_MODULE};
 use ez_quick_js::{
-    ffi::{js_to_string, JSCFunctionListEntry, JSContext, JSModuleDef, JSValue, JS_UNDEFINED},
+    ffi::{js_to_string, JSCFunctionListEntry, JSContext, JSModuleDef, JSValue},
     function::{add_module_export_list, js_set_module_export_list},
     Context, JsModuleDef, Runtime,
 };
@@ -26,15 +27,13 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
-const JS_FUNC_LIST: &[JSCFunctionListEntry] = &[c_func_def!("Print", 1, Some(js_print))];
-
 /// 创建模块并导出对象
 fn init_module(ctx: &Context, module_name: &str) -> Result<JsModuleDef, Error> {
     // 创建模块，并初始化模块内本地对象
     let m = ctx.new_module(module_name, Some(init_module_inner_object))?;
 
     // 导出 tab (JS_FUNC_LIST) 列表中同名的本地对象
-    unsafe { add_module_export_list(ctx, &m, JS_FUNC_LIST)? };
+    unsafe { add_module_export_list(ctx, &m, JS_FUNC_LIST.as_ref())?};
 
     Ok(m)
 }
@@ -45,8 +44,28 @@ unsafe extern "C" fn init_module_inner_object(
     m: *mut JSModuleDef,
 ) -> ::std::os::raw::c_int {
     // 生成模块内的本地对象
-    js_set_module_export_list(ctx, m, JS_FUNC_LIST)
+    js_set_module_export_list(ctx, m, JS_FUNC_LIST.as_ref())
 }
+
+const JS_FUNC_LIST: &[JSCFunctionListEntry] = &[
+    C_FUNC_DEF(b"Print\0", 1, Some(js_print))
+];
+
+// const JS_FUNC_LIST: [JSCFunctionListEntry; 1] = [
+//     JSCFunctionListEntry {
+//         name: b"Print\0".as_ptr() as _,
+//         prop_flags: (ez_quick_js::ffi::JS_PROP_WRITABLE | ez_quick_js::ffi::JS_PROP_CONFIGURABLE) as u8,
+//         def_type: ez_quick_js::ffi::JS_DEF_CFUNC as u8,
+//         magic: 0,
+//         u: ez_quick_js::ffi::JSCFunctionListEntry__bindgen_ty_1 {
+//             func: ez_quick_js::ffi::JSCFunctionListEntry__bindgen_ty_1__bindgen_ty_1 {
+//                 length: 1,
+//                 cproto: ez_quick_js::ffi::JSCFunctionEnum_JS_CFUNC_generic as u8,
+//                 cfunc: ez_quick_js::ffi::JSCFunctionType { generic: Some(js_print) },
+//             },
+//         },
+//     }
+// ];
 
 unsafe extern "C" fn js_print(
     ctx: *mut JSContext,

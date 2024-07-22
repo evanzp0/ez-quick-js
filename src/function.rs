@@ -8,14 +8,15 @@ use std::{
 use crate::{
     common::{make_cstring, Error},
     ffi::{
-        js_free, js_new_object_with_proto, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor,
-        JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionListEntry, JSCFunctionMagic, JSContext,
-        JSModuleDef, JSModuleInitFunc, JSValue, JS_AddModuleExport, JS_Call,
-        JS_DefinePropertyValue, JS_EvalFunction, JS_GetException, JS_NewAtomLen, JS_NewCFunction2,
-        JS_NewCModule, JS_ReadObject, JS_SetModuleExportList, JS_WriteObject, JS_NULL_PTR,
-        JS_READ_OBJ_BYTECODE, JS_UNDEFINED, JS_WRITE_OBJ_BYTECODE,
+        js_free, js_new_object_with_proto, JSAtom, JSCFunction,
+        JSCFunctionEnum_JS_CFUNC_constructor, JSCFunctionEnum_JS_CFUNC_generic,
+        JSCFunctionListEntry, JSCFunctionMagic, JSContext, JSModuleDef, JSModuleInitFunc, JSValue,
+        JSValueUnion, JS_AddModuleExport, JS_Call, JS_DefinePropertyValue, JS_EvalFunction,
+        JS_GetException, JS_NewAtomLen, JS_NewCFunction2, JS_NewCModule, JS_ReadObject,
+        JS_SetModuleExportList, JS_SetPropertyFunctionList, JS_WriteObject, JS_READ_OBJ_BYTECODE,
+        JS_WRITE_OBJ_BYTECODE,
     },
-    Context, JsAtom, JsCompiledFunction, JsFunction, JsModuleDef, JsValue,
+    Context, JsAtom, JsCompiledFunction, JsFunction, JsModuleDef, JsValue, JS_UNDEFINED,
 };
 
 pub fn js_eval<'a>(
@@ -229,6 +230,19 @@ pub fn new_atom<'a>(ctx: &'a Context, name: &str) -> Result<JsAtom<'a>, Error> {
     Ok(atom)
 }
 
+pub fn define_property_str(
+    ctx: &Context,
+    this_obj: &JsValue,
+    prop_name: &str,
+    prop_value: JsValue,
+    flags: i32,
+) -> Result<(), Error> {
+    // println!("{prop_name}, {:?}", prop_value.tag());
+
+    let prop_name = ctx.new_atom(prop_name)?;
+    define_property(ctx, this_obj, prop_name, prop_value, flags)
+}
+
 pub fn define_property(
     ctx: &Context,
     this_obj: &JsValue,
@@ -241,7 +255,7 @@ pub fn define_property(
             ctx.inner,
             this_obj.inner,
             prop_name.inner,
-            prop_value.inner,
+            prop_value.dup_value(),
             flags,
         )
     };
@@ -345,43 +359,25 @@ pub unsafe fn add_module_export_list(
     module: &JsModuleDef,
     tab: &[JSCFunctionListEntry],
 ) -> Result<(), Error> {
-    for item in tab {
-        add_module_export(ctx.inner, module.raw_value(), item.name)?;
-    }
+    // for item in tab {
+    //     add_module_export(ctx.inner, module.raw_value(), item.name)?;
+    // }
+
+    crate::ffi::JS_AddModuleExportList(
+        ctx.inner,
+        module.raw_value(),
+        tab.as_ptr(),
+        tab.len() as i32,
+    );
 
     Ok(())
 }
 
-/*
- #define JS_CFUNC_DEF(name, length, func1)
- {
-    name,
-    JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE,
-    JS_DEF_CFUNC,
-    0,
-    .u = {
-        .func = {
-            length,
-            JS_CFUNC_generic,
-            {
-                .generic = func1
-            }
-        }
-    }
-}
-
-pub type JSCFunction = ::std::option::Option<
-    unsafe extern "C" fn(
-        ctx: *mut JSContext,
-        this_val: JSValue,
-        argc: ::std::os::raw::c_int,
-        argv: *mut JSValue,
-    ) -> JSValue,
->;
-
-fn c_func_def(name: &'static str, length: u8, func1: JSCFunction) {
+pub const fn C_FUNC_DEF(name: &[u8], length: u8, func1: JSCFunction) -> JSCFunctionListEntry {
+    let name = name.as_ptr() as _;
+    
     JSCFunctionListEntry {
-        name: name.as_ptr() as *const i8,
+        name,
         prop_flags: (crate::ffi::JS_PROP_WRITABLE | crate::ffi::JS_PROP_CONFIGURABLE) as u8,
         def_type: crate::ffi::JS_DEF_CFUNC as u8,
         magic: 0,
@@ -389,33 +385,33 @@ fn c_func_def(name: &'static str, length: u8, func1: JSCFunction) {
             func: crate::ffi::JSCFunctionListEntry__bindgen_ty_1__bindgen_ty_1 {
                 length: length,
                 cproto: crate::ffi::JSCFunctionEnum_JS_CFUNC_generic as u8,
-                cfunc: crate::ffi::JSCFunctionType {
-                    generic: func1
-                },
-            }
-        },
-    };
-}
-*/
-
-#[macro_export]
-macro_rules! c_func_def {
-    ($name: expr, $length: expr, $func1: expr) => {
-        JSCFunctionListEntry {
-            name: $name.as_ptr() as *const i8,
-            prop_flags: (ez_quick_js::ffi::JS_PROP_WRITABLE
-                | ez_quick_js::ffi::JS_PROP_CONFIGURABLE) as u8,
-            def_type: ez_quick_js::ffi::JS_DEF_CFUNC as u8,
-            magic: 0,
-            u: ez_quick_js::ffi::JSCFunctionListEntry__bindgen_ty_1 {
-                func: ez_quick_js::ffi::JSCFunctionListEntry__bindgen_ty_1__bindgen_ty_1 {
-                    length: $length,
-                    cproto: ez_quick_js::ffi::JSCFunctionEnum_JS_CFUNC_generic as u8,
-                    cfunc: ez_quick_js::ffi::JSCFunctionType { generic: $func1 },
-                },
+                cfunc: crate::ffi::JSCFunctionType { generic: func1 },
             },
-        }
-    };
+        },
+    }
+}
+
+pub const fn OBJECT_DEF(
+    name: &[u8],
+    tab: &[JSCFunctionListEntry],
+    prop_flags: u32,
+) -> JSCFunctionListEntry {
+    let name = name.as_ptr() as _;
+    let len = tab.len() as i32;
+    let tab = tab.as_ptr();
+    
+    JSCFunctionListEntry {
+        name,
+        prop_flags: prop_flags as u8,
+        def_type: crate::ffi::JS_DEF_OBJECT as u8,
+        magic: 0,
+        u: crate::ffi::JSCFunctionListEntry__bindgen_ty_1 {
+            prop_list: crate::ffi::JSCFunctionListEntry__bindgen_ty_1__bindgen_ty_4 {
+                tab,
+                len,
+            },
+        },
+    }
 }
 
 /// 根据 tab 列表，设置模块内的本地对象
@@ -425,6 +421,10 @@ pub fn js_set_module_export_list(
     tab: &[JSCFunctionListEntry],
 ) -> ::std::os::raw::c_int {
     unsafe { JS_SetModuleExportList(ctx, m, tab.as_ptr(), tab.len() as _) }
+}
+
+pub fn set_property_function_list(ctx: &Context, this_obj: &JsValue, tab: &[JSCFunctionListEntry]) {
+    unsafe { JS_SetPropertyFunctionList(ctx.inner, this_obj.inner, tab.as_ptr(), tab.len() as i32) }
 }
 
 #[cfg(test)]

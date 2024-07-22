@@ -5,13 +5,6 @@ use std::{
 
 use crate::{ffi::*, JsTag};
 
-pub const JS_NULL_PTR: *mut crate::ffi::JSValue = std::ptr::null_mut();
-pub const NULL_SIZE: *mut usize = std::ptr::null_mut();
-pub const JS_UNDEFINED: crate::ffi::JSValue = JSValue {
-    u: JSValueUnion { int32: 0 },
-    tag: JS_TAG_UNDEFINED as i64,
-};
-
 extern "C" {
     fn JS_ValueGetTag_real(v: JSValue) -> i32;
     fn JS_DupValue_real(ctx: *mut JSContext, v: JSValue);
@@ -43,6 +36,8 @@ extern "C" {
         prop: JSAtom,
         val: JSValue,
     ) -> ::std::os::raw::c_int;
+
+    fn JS_Find_Atom_real(ctx: *mut JSContext, name: *const c_char) -> JSAtom ;
 }
 
 /// Increment the refcount of this value

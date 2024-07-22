@@ -1,14 +1,9 @@
 use crate::{
-    common::Error,
-    ffi::{
-        js_new_object_with_proto, JSCFunction, JSContext, JSModuleInitFunc, JS_FreeContext,
-        JS_FreeRuntime, JS_GetRuntime, JS_NewContext, JS_UNDEFINED,
-    },
-    function::{
+    common::Error, ffi::{
+        js_new_object_with_proto, JSCFunction, JSContext, JSModuleInitFunc, JS_FreeContext, JS_FreeRuntime, JS_GetRuntime, JS_NewContext, 
+    }, function::{
         get_global_object, js_eval, new_atom, new_c_function, new_c_module, new_object_with_proto,
-    },
-    CFunctionInner, JsAtom, JsBoolean, JsInteger, JsModuleDef, JsNumber, JsString, JsValue,
-    Runtime,
+    }, CFunctionInner, JsAtom, JsBoolean, JsInteger, JsModuleDef, JsNumber, JsString, JsValue, Runtime, JS_NULL, JS_UNDEFINED
 };
 
 pub struct Context {
@@ -62,6 +57,11 @@ impl Context {
 
     pub fn new_object(&self) -> Result<JsValue, Error> {
         new_object_with_proto(self, None)
+    }
+
+    pub fn new_prototype(&self) -> Result<JsValue, Error> {
+        let js_null = JsValue::new(self, JS_NULL);
+        new_object_with_proto(self, Some(js_null))
     }
 
     pub fn new_atom(&self, name: &str) -> Result<JsAtom, Error> {
