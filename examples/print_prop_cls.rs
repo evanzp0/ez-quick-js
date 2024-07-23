@@ -42,6 +42,7 @@ const PRINT_CLASS_DEF: JSClassDef = JSClassDef {
     exotic: std::ptr::null_mut(),
 };
 
+/// PrintClass constructor 的主逻辑
 fn js_printclass_constructor2_inner<'a>(
     ctx: &'a Context,
     new_target: &JsValue,
@@ -93,7 +94,7 @@ fn js_printclass_constructor2_inner<'a>(
     Ok(unsafe { js_print_obj.forget() })
 }
 
-/// Print 构造函数, 返回值为一个 Print （JsValue）实例对象，并将该和 native 对象关联
+/// PrintClass Constructor 的包装函数, 返回值为一个 Print （JsValue）实例对象，并将该和 native 对象关联
 unsafe extern "C" fn js_printclass_constructor2(
     ctx: *mut JSContext,
     new_target: JSValue,
