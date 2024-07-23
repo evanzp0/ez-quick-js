@@ -10,13 +10,16 @@ use crate::{
     ffi::{
         js_free, js_new_object_with_proto, JSAtom, JSCFunction,
         JSCFunctionEnum_JS_CFUNC_constructor, JSCFunctionEnum_JS_CFUNC_generic,
-        JSCFunctionListEntry, JSCFunctionMagic, JSContext, JSModuleDef, JSModuleInitFunc, JSValue,
-        JSValueUnion, JS_AddModuleExport, JS_Call, JS_DefinePropertyValue, JS_EvalFunction,
-        JS_GetException, JS_NewAtomLen, JS_NewCFunction2, JS_NewCModule, JS_ReadObject,
-        JS_SetModuleExportList, JS_SetPropertyFunctionList, JS_WriteObject, JS_READ_OBJ_BYTECODE,
+        JSCFunctionListEntry, JSCFunctionMagic, JSCFunctionType, JSClassDef, JSClassID, JSContext,
+        JSModuleDef, JSModuleInitFunc, JSValue, JSValueUnion, JS_AddModuleExport, JS_Call,
+        JS_DefinePropertyValue, JS_EvalFunction, JS_GetException, JS_NewAtomLen, JS_NewCFunction2,
+        JS_NewCModule, JS_NewClass, JS_NewClassID, JS_ReadObject, JS_SetClassProto,
+        JS_SetConstructor, JS_SetModuleExportList, JS_SetPropertyFunctionList, JS_WriteObject,
+        JS_DEF_CFUNC, JS_DEF_CGETSET, JS_PROP_CONFIGURABLE, JS_PROP_WRITABLE, JS_READ_OBJ_BYTECODE,
         JS_WRITE_OBJ_BYTECODE,
     },
-    Context, JsAtom, JsCompiledFunction, JsFunction, JsModuleDef, JsValue, JS_UNDEFINED,
+    Context, JSCGetter, JSCSetter, JsAtom, JsCompiledFunction, JsFunction, JsModuleDef, JsValue,
+    JS_UNDEFINED,
 };
 
 pub fn js_eval<'a>(
@@ -166,7 +169,7 @@ pub fn new_c_function2<'a>(
     arg_count: i32,
     is_constructor: bool,
 ) -> Result<JsValue<'a>, Error> {
-    new_c_function_magic(ctx, func, name, arg_count, false, 0)
+    new_c_function_magic(ctx, func, name, arg_count, is_constructor, 0)
 }
 
 pub fn new_c_function_magic<'a>(
@@ -237,8 +240,6 @@ pub fn define_property_str(
     prop_value: JsValue,
     flags: i32,
 ) -> Result<(), Error> {
-    // println!("{prop_name}, {:?}", prop_value.tag());
-
     let prop_name = ctx.new_atom(prop_name)?;
     define_property(ctx, this_obj, prop_name, prop_value, flags)
 }
@@ -375,11 +376,11 @@ pub unsafe fn add_module_export_list(
 
 pub const fn C_FUNC_DEF(name: &[u8], length: u8, func1: JSCFunction) -> JSCFunctionListEntry {
     let name = name.as_ptr() as _;
-    
+
     JSCFunctionListEntry {
         name,
-        prop_flags: (crate::ffi::JS_PROP_WRITABLE | crate::ffi::JS_PROP_CONFIGURABLE) as u8,
-        def_type: crate::ffi::JS_DEF_CFUNC as u8,
+        prop_flags: (JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE) as u8,
+        def_type: JS_DEF_CFUNC as u8,
         magic: 0,
         u: crate::ffi::JSCFunctionListEntry__bindgen_ty_1 {
             func: crate::ffi::JSCFunctionListEntry__bindgen_ty_1__bindgen_ty_1 {
@@ -399,23 +400,41 @@ pub const fn OBJECT_DEF(
     let name = name.as_ptr() as _;
     let len = tab.len() as i32;
     let tab = tab.as_ptr();
-    
+
     JSCFunctionListEntry {
         name,
         prop_flags: prop_flags as u8,
         def_type: crate::ffi::JS_DEF_OBJECT as u8,
         magic: 0,
         u: crate::ffi::JSCFunctionListEntry__bindgen_ty_1 {
-            prop_list: crate::ffi::JSCFunctionListEntry__bindgen_ty_1__bindgen_ty_4 {
-                tab,
-                len,
+            prop_list: crate::ffi::JSCFunctionListEntry__bindgen_ty_1__bindgen_ty_4 { tab, len },
+        },
+    }
+}
+
+pub const fn C_GET_SET_DEF(
+    name: &[u8],
+    fgetter: JSCGetter,
+    fsetter: JSCSetter,
+) -> JSCFunctionListEntry {
+    let name = name.as_ptr() as _;
+
+    JSCFunctionListEntry {
+        name,
+        prop_flags: JS_PROP_CONFIGURABLE as u8,
+        def_type: JS_DEF_CGETSET as u8,
+        magic: 0,
+        u: crate::ffi::JSCFunctionListEntry__bindgen_ty_1 {
+            getset: crate::ffi::JSCFunctionListEntry__bindgen_ty_1__bindgen_ty_2 {
+                get: JSCFunctionType { getter: fgetter },
+                set: JSCFunctionType { setter: fsetter },
             },
         },
     }
 }
 
 /// 根据 tab 列表，设置模块内的本地对象
-pub fn js_set_module_export_list(
+pub fn set_module_export_list(
     ctx: *mut JSContext,
     m: *mut JSModuleDef,
     tab: &[JSCFunctionListEntry],
@@ -425,6 +444,54 @@ pub fn js_set_module_export_list(
 
 pub fn set_property_function_list(ctx: &Context, this_obj: &JsValue, tab: &[JSCFunctionListEntry]) {
     unsafe { JS_SetPropertyFunctionList(ctx.inner, this_obj.inner, tab.as_ptr(), tab.len() as i32) }
+}
+
+pub fn new_class_id(class_id: &mut JSClassID) -> JSClassID {
+    unsafe { JS_NewClassID(class_id as _) }
+}
+
+// class_id 是从 1 开始生成的
+pub fn new_class(ctx: &Context, class_id: JSClassID, class_def: &JSClassDef) -> Result<(), Error> {
+    let rst = unsafe {
+        JS_NewClass(
+            ctx.get_runtime().inner,
+            class_id,
+            class_def as _,
+        )
+    };
+
+    if rst == -1 {
+        if let Some(err) = get_last_exception(ctx) {
+            Err(err)?
+        } else {
+            Err(Error::GeneralError("new_class() failed".to_owned()))?
+        }
+    }
+
+    Ok(())
+}
+
+/// 1. ctor (Js Point 类构造器)的 prototype 值设为 proto
+/// 2. 将 proto 的 construct 值设为 ctor  
+pub fn set_constructor(ctx: &Context, func_obj: &JsValue, proto: &JsValue) -> Result<(), Error> {
+    unsafe { JS_SetConstructor(ctx.inner, func_obj.inner, proto.inner) };
+
+    if let Some(err) = get_last_exception(ctx) {
+        Err(err)?
+    }
+
+    Ok(())
+}
+
+// pub fn JS_SetClassProto(ctx: *mut JSContext, class_id: JSClassID, obj: JSValue);
+pub fn set_class_proto(ctx: &Context, class_id: JSClassID, obj: &JsValue) -> Result<(), Error> {
+    unsafe { JS_SetClassProto(ctx.inner, class_id, obj.inner) };
+
+    if let Some(err) = get_last_exception(ctx) {
+        Err(err)?
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

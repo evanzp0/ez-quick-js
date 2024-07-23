@@ -59,9 +59,8 @@ impl Context {
         new_object_with_proto(self, None)
     }
 
-    pub fn new_prototype(&self) -> Result<JsValue, Error> {
-        let js_null = JsValue::new(self, JS_NULL);
-        new_object_with_proto(self, Some(js_null))
+    pub fn new_prototype(&self, proto: JsValue) -> Result<JsValue, Error> {
+        new_object_with_proto(self, Some(proto))
     }
 
     pub fn new_atom(&self, name: &str) -> Result<JsAtom, Error> {

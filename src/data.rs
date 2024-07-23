@@ -4,11 +4,16 @@ use crate::{
     common::{make_cstring, Error},
     ffi::{
         js_dup_value, js_free_value, js_new_float64, js_new_int32, js_new_string, js_to_f64,
-        js_to_i32, JSContext, JSRefCountHeader, JSValue, JSValueUnion, JS_ATOM_NULL, JS_TAG_NULL,
-        JS_TAG_UNDEFINED,
+        js_to_i32, JSContext, JSRefCountHeader, JSValue, JSValueUnion, JS_ATOM_NULL,
+        JS_TAG_EXCEPTION, JS_TAG_NULL, JS_TAG_UNDEFINED,
     },
     function::{get_last_exception, run_compiled_function, to_bytecode},
 };
+
+pub type JSCGetter =
+    Option<unsafe extern "C" fn(ctx: *mut JSContext, this_val: JSValue) -> JSValue>;
+pub type JSCSetter =
+    Option<unsafe extern "C" fn(ctx: *mut JSContext, this_val: JSValue, val: JSValue) -> JSValue>;
 
 pub const JS_NULL: JSValue = JS_MKVAL(JS_TAG_NULL, 0);
 pub const JS_NULL_PTR: *mut crate::ffi::JSValue = std::ptr::null_mut();
@@ -17,6 +22,7 @@ pub const JS_UNDEFINED: crate::ffi::JSValue = JSValue {
     u: JSValueUnion { int32: 0 },
     tag: JS_TAG_UNDEFINED as i64,
 };
+pub const JS_EXCEPTION: JSValue = JS_MKVAL(JS_TAG_EXCEPTION, 0);
 
 macro_rules! struct_type {
     ($type:ident) => {

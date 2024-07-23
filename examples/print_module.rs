@@ -6,7 +6,7 @@ use ez_quick_js::JS_UNDEFINED;
 use ez_quick_js::ffi::{JS_EVAL_TYPE_GLOBAL, JS_EVAL_TYPE_MODULE};
 use ez_quick_js::{
     ffi::{js_to_string, JSCFunctionListEntry, JSContext, JSModuleDef, JSValue},
-    function::{add_module_export_list, js_set_module_export_list},
+    function::{add_module_export_list, set_module_export_list},
     Context, JsModuleDef, Runtime,
 };
 
@@ -44,7 +44,7 @@ unsafe extern "C" fn init_module_inner_object(
     m: *mut JSModuleDef,
 ) -> ::std::os::raw::c_int {
     // 生成模块内的本地对象
-    js_set_module_export_list(ctx, m, JS_FUNC_LIST.as_ref())
+    set_module_export_list(ctx, m, JS_FUNC_LIST.as_ref())
 }
 
 const JS_FUNC_LIST: &[JSCFunctionListEntry] = &[
