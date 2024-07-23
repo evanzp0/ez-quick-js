@@ -636,6 +636,10 @@ impl<'a> JsValue<'a> {
         let prop_name = self.ctx.new_atom(prop_name)?;
         crate::function::define_property(self.ctx, self, prop_name, prop_value, flags)
     }
+    
+    pub fn set_opaque(&self, opaque: *mut ::std::os::raw::c_void) {
+        unsafe {crate::ffi::JS_SetOpaque(self.inner, opaque)}
+    }
 
     is_fn!(is_undefined);
     is_fn!(is_object);

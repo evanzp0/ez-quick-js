@@ -8,15 +8,7 @@ use std::{
 use crate::{
     common::{make_cstring, Error},
     ffi::{
-        js_free, js_new_object_with_proto, JSAtom, JSCFunction,
-        JSCFunctionEnum_JS_CFUNC_constructor, JSCFunctionEnum_JS_CFUNC_generic,
-        JSCFunctionListEntry, JSCFunctionMagic, JSCFunctionType, JSClassDef, JSClassID, JSContext,
-        JSModuleDef, JSModuleInitFunc, JSValue, JSValueUnion, JS_AddModuleExport, JS_Call,
-        JS_DefinePropertyValue, JS_EvalFunction, JS_GetException, JS_NewAtomLen, JS_NewCFunction2,
-        JS_NewCModule, JS_NewClass, JS_NewClassID, JS_ReadObject, JS_SetClassProto,
-        JS_SetConstructor, JS_SetModuleExportList, JS_SetPropertyFunctionList, JS_WriteObject,
-        JS_DEF_CFUNC, JS_DEF_CGETSET, JS_PROP_CONFIGURABLE, JS_PROP_WRITABLE, JS_READ_OBJ_BYTECODE,
-        JS_WRITE_OBJ_BYTECODE,
+        js_free, js_new_object_with_proto, JSAtom, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor, JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionListEntry, JSCFunctionMagic, JSCFunctionType, JSClassDef, JSClassID, JSContext, JSModuleDef, JSModuleInitFunc, JSValue, JSValueUnion, JS_AddModuleExport, JS_Call, JS_DefinePropertyValue, JS_EvalFunction, JS_GetException, JS_NewAtomLen, JS_NewCFunction2, JS_NewCModule, JS_NewClass, JS_NewClassID, JS_NewObjectProtoClass, JS_ReadObject, JS_SetClassProto, JS_SetConstructor, JS_SetModuleExportList, JS_SetPropertyFunctionList, JS_WriteObject, JS_DEF_CFUNC, JS_DEF_CGETSET, JS_PROP_CONFIGURABLE, JS_PROP_WRITABLE, JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE
     },
     Context, JSCGetter, JSCSetter, JsAtom, JsCompiledFunction, JsFunction, JsModuleDef, JsValue,
     JS_UNDEFINED,
@@ -492,6 +484,15 @@ pub fn set_class_proto(ctx: &Context, class_id: JSClassID, obj: &JsValue) -> Res
     }
 
     Ok(())
+}
+
+pub fn new_object_proto_class<'a>(
+    ctx: &'a Context,
+    proto: &JsValue,
+    class_id: JSClassID,
+) -> JsValue<'a> {
+    let val = unsafe { JS_NewObjectProtoClass(ctx.inner, proto.inner, class_id) };
+    JsValue::new(ctx, val)
 }
 
 #[cfg(test)]

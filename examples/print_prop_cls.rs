@@ -5,12 +5,12 @@ use std::ptr::null_mut;
 
 use anyhow::Error;
 use ez_quick_js::ffi::{
-    js_free, js_free_rt, js_free_value, js_is_exception, js_malloc, js_to_string, JSClassDef,
-    JSClassID, JSRuntime, JS_GetOpaque, JS_GetOpaque2, JS_GetPropertyStr, JS_NewObjectProtoClass,
-    JS_SetOpaque, JS_ToInt32, JS_EVAL_TYPE_GLOBAL, JS_TAG_INT,
+    js_free, js_free_rt, js_malloc, js_to_string, JSClassDef,
+    JSClassID, JSRuntime, JS_GetOpaque, JS_GetOpaque2,
+    JS_EVAL_TYPE_GLOBAL, JS_TAG_INT,
 };
 use ez_quick_js::function::{
-    new_c_function2, new_class, new_class_id, set_class_proto,
+    new_c_function2, new_class, new_class_id, new_object_proto_class, set_class_proto,
     set_constructor, set_property_function_list, C_FUNC_DEF, C_GET_SET_DEF,
 };
 use ez_quick_js::{
@@ -42,52 +42,86 @@ const PRINT_CLASS_DEF: JSClassDef = JSClassDef {
     exotic: std::ptr::null_mut(),
 };
 
+fn js_printclass_constructor2_inner<'a>(
+    ctx: &'a Context,
+    new_target: &JsValue,
+    args: &[JsValue],
+) -> Result<JSValue, ez_quick_js::common::Error> {
+    println!("PrintClass constructor is called");
+
+    // 生成 native 对象
+    let native_print =
+        unsafe { js_malloc(ctx.inner, size_of::<PrintClass>()) } as *const PrintClass;
+    if native_print == null_mut() {
+        unsafe { js_free(ctx.inner, native_print as _) };
+        Err(ez_quick_js::common::Error::GeneralError(
+            "js_malloc() is failed when alloc print class".to_owned(),
+        ))?
+    }
+
+    // defer!(unsafe {
+    //     js_free(ctx.inner, native_print as _);
+    // });
+
+    if args.len() > 0 {
+        let val = args[0].clone().to_int()?.value();
+        unsafe {
+            (*(native_print as *mut PrintClass)).val = val;
+        }
+    }
+
+    // 获取 new_target 的 prototype
+    let proto = {
+        let tmp = new_target
+            .get_property("prototype")
+            .ok_or(ez_quick_js::common::Error::GeneralError(
+                "JS_GetPropertyStr() is failed when get 'prototype'".to_owned(),
+            ));
+        if let Err(err) = tmp {
+            unsafe { js_free(ctx.inner, native_print as _) };
+            Err(err)?
+        } else {
+            tmp.unwrap()
+        }
+    };
+
+    let cls_id = unsafe { PRINT_CLASS_ID };
+    let js_print_obj =
+        new_object_proto_class(ctx, &proto /* 也可以设为 JS_NULL */, cls_id);
+    js_print_obj.set_opaque(native_print as _);
+
+    Ok(unsafe { js_print_obj.forget() })
+}
+
 /// Print 构造函数, 返回值为一个 Print （JsValue）实例对象，并将该和 native 对象关联
-unsafe extern "C" fn js_printclass_constructor(
+unsafe extern "C" fn js_printclass_constructor2(
     ctx: *mut JSContext,
     new_target: JSValue,
     argc: ::std::os::raw::c_int,
     argv: *mut JSValue,
 ) -> JSValue {
-    println!("PrintClass constructor is called");
+    let ctx = Context::from_raw(ctx);
+    let new_target = JsValue::new(&ctx, new_target);
 
-    let args = std::slice::from_raw_parts(argv, argc as usize);
+    let rst = {
+        let args = {
+            let tmp = std::slice::from_raw_parts(argv, argc as usize);
+            let tmp = tmp
+                .iter()
+                .map(|val| JsValue::new(&ctx, *val))
+                .collect::<Vec<JsValue>>();
+            tmp
+        };
 
-    // 生成 native 对象
-    let native_print = js_malloc(ctx, size_of::<PrintClass>()) as *mut PrintClass;
-    if native_print == null_mut() {
-        return JS_EXCEPTION;
-    }
+        js_printclass_constructor2_inner(&ctx, &new_target, &args)
+    };
 
-    if argc > 0 {
-        let mut tmp = 0;
-        let rst = JS_ToInt32(ctx, &mut tmp as _, args[0]);
-        (*native_print).val = tmp;
+    let ret_val = if let Ok(val) = rst { val } else { JS_EXCEPTION };
 
-        if rst != 0 {
-            js_free(ctx, native_print as _);
-            return JS_EXCEPTION;
-        }
-    }
+    new_target.forget();
+    ctx.forget();
 
-    // 获取 new_target 的 prototype
-    let proto = JS_GetPropertyStr(ctx, new_target, b"prototype\0".as_ptr() as _);
-    if js_is_exception(proto) {
-        js_free(ctx, native_print as _);
-        return JS_EXCEPTION;
-    }
-
-    // 用 proto 对应的 shape 生成一个新 JS 实例对象，该对象的 class_id 为 print_class_id, prototype 为 proto
-    let js_print_obj = JS_NewObjectProtoClass(
-        ctx,
-        proto, /* 也可以设为 JS_NULL */
-        PRINT_CLASS_ID,
-    );
-    JS_SetOpaque(js_print_obj, native_print as _);
-
-    js_free_value(ctx, proto);
-
-    js_print_obj
+    ret_val
 }
 
 unsafe extern "C" fn js_print_test_func(
@@ -176,7 +210,7 @@ fn init_register_class(ctx: &Context, global_obj: &JsValue) -> Result<(), Error>
     // JSValue ctor = JS_NewCFunction2(ctx, Js_PrintClass_Constructor, print_class_def.class_name, 1, JS_CFUNC_constructor, 0);
     let print_ctor = new_c_function2(
         ctx,
-        Some(js_printclass_constructor),
+        Some(js_printclass_constructor2),
         &class_name.to_string_lossy(),
         1,
         true,
@@ -245,3 +279,52 @@ unsafe extern "C" fn js_print(
 
     JS_UNDEFINED
 }
+
+
+///// Print 构造函数, 返回值为一个 Print （JsValue）实例对象，并将该和 native 对象关联
+// unsafe extern "C" fn js_printclass_constructor(
+//     ctx: *mut JSContext,
+//     new_target: JSValue,
+//     argc: ::std::os::raw::c_int,
+//     argv: *mut JSValue,
+// ) -> JSValue {
+//     println!("PrintClass constructor is called");
+
+//     let args = std::slice::from_raw_parts(argv, argc as usize);
+
+//     // 生成 native 对象
+//     let native_print = js_malloc(ctx, size_of::<PrintClass>()) as *mut PrintClass;
+//     if native_print == null_mut() {
+//         return JS_EXCEPTION;
+//     }
+
+//     if argc > 0 {
+//         let mut tmp = 0;
+//         let rst = JS_ToInt32(ctx, &mut tmp as _, args[0]);
+//         (*native_print).val = tmp;
+
+//         if rst != 0 {
+//             js_free(ctx, native_print as _);
+//             return JS_EXCEPTION;
+//         }
+//     }
+
+//     // 获取 new_target 的 prototype
+//     let proto = JS_GetPropertyStr(ctx, new_target, b"prototype\0".as_ptr() as _);
+//     if js_is_exception(proto) {
+//         js_free(ctx, native_print as _);
+//         return JS_EXCEPTION;
+//     }
+
+//     // 用 proto 对应的 shape 生成一个新 JS 实例对象，该对象的 class_id 为 print_class_id, prototype 为 proto
+//     let js_print_obj = JS_NewObjectProtoClass(
+//         ctx,
+//         proto, /* 也可以设为 JS_NULL */
+//         PRINT_CLASS_ID,
+//     );
+//     JS_SetOpaque(js_print_obj, native_print as _);
+
+//     js_free_value(ctx, proto);
+
+//     js_print_obj
+// }
