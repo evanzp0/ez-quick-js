@@ -328,17 +328,19 @@ pub fn new_c_module(
 /// set an export in a JSModuleDef, this should be called BEFORE this init_func(as passed to new_module()) is called
 /// # Safety
 /// Please ensure the context passed is still valid
-pub unsafe fn add_module_export(
-    ctx: *mut JSContext,
-    module: *mut JSModuleDef,
+pub fn add_module_export(
+    ctx: &Context,
+    module: &JsModuleDef,
     export_name: *const c_char,
 ) -> Result<(), Error> {
-    let res = JS_AddModuleExport(ctx, module, export_name);
+    let name = unsafe { CStr::from_ptr(export_name) };
+    println!("{:?}", name);
+    let res = unsafe { JS_AddModuleExport(ctx.inner, module.raw_value(), export_name) };
 
     if res == 0 {
         Ok(())
     } else {
-        let name = CStr::from_ptr(export_name);
+        let name = unsafe { CStr::from_ptr(export_name) };
         Err(Error::GeneralError(format!(
             "JS_AddModuleExport '{}' failed",
             name.to_string_lossy()
@@ -347,21 +349,23 @@ pub unsafe fn add_module_export(
 }
 
 /// 通过 tab 获取要导出的对象名称，并根据名称导出对象到模块 m 上
-pub unsafe fn add_module_export_list(
+pub fn add_module_export_list(
     ctx: &Context,
     module: &JsModuleDef,
     tab: &[JSCFunctionListEntry],
 ) -> Result<(), Error> {
-    // for item in tab {
-    //     add_module_export(ctx.inner, module.raw_value(), item.name)?;
+    for item in tab {
+        add_module_export(ctx, module, item.name)?;
+    }
+    
+    // unsafe {
+    //     crate::ffi::JS_AddModuleExportList(
+    //         ctx.inner,
+    //         module.raw_value(),
+    //         tab.as_ptr(),
+    //         tab.len() as i32,
+    //     );
     // }
-
-    crate::ffi::JS_AddModuleExportList(
-        ctx.inner,
-        module.raw_value(),
-        tab.as_ptr(),
-        tab.len() as i32,
-    );
 
     Ok(())
 }

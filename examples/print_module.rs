@@ -33,7 +33,7 @@ fn init_module(ctx: &Context, module_name: &str) -> Result<JsModuleDef, Error> {
     let m = ctx.new_module(module_name, Some(init_module_inner_object))?;
 
     // 导出 tab (JS_FUNC_LIST) 列表中同名的本地对象
-    unsafe { add_module_export_list(ctx, &m, JS_FUNC_LIST.as_ref())?};
+    add_module_export_list(ctx, &m, JS_FUNC_LIST.as_ref())?;
 
     Ok(m)
 }
