@@ -1,13 +1,12 @@
 use std::cell::Cell;
 use std::ffi::CStr;
 use std::fs;
-use std::mem::size_of;
 use std::ptr::null_mut;
 
 use anyhow::Error;
 use ez_quick_js::ffi::{
-    js_free, js_free_rt, js_malloc, js_to_string, JSClassDef, JSClassID, JSRuntime, JS_GetOpaque,
-    JS_GetOpaque2, JS_EVAL_TYPE_GLOBAL, JS_TAG_INT,
+    js_to_string, JSClassDef, JSClassID, JSRuntime, JS_GetOpaque, JS_GetOpaque2,
+    JS_EVAL_TYPE_GLOBAL, JS_TAG_INT,
 };
 use ez_quick_js::function::{
     new_c_function2, new_class, new_class_id, new_object_proto_class, set_class_proto,
@@ -24,13 +23,25 @@ struct PrintClass {
     val: i32,
 }
 
+impl Drop for PrintClass {
+    fn drop(&mut self) {
+        println!("PrintClass is drop");
+    }
+}
+
 static mut PRINT_CLASS_ID: JSClassID = 0;
 
-unsafe extern "C" fn js_print_cls_finalizer(rt: *mut JSRuntime, val: JSValue) {
-    let native_print = JS_GetOpaque(val, PRINT_CLASS_ID) as _;
+unsafe extern "C" fn js_print_cls_finalizer(_rt: *mut JSRuntime, val: JSValue) {
+    let native_print = JS_GetOpaque(val, PRINT_CLASS_ID) as *mut Cell<PrintClass>;
 
-    if native_print == std::ptr::null_mut() {
-        js_free_rt(rt, native_print);
+    println!(
+        "js_print_cls_finalizer run: {}",
+        (*native_print).get_mut().val
+    );
+
+    if native_print != std::ptr::null_mut() {
+        let _ = Box::from_raw(native_print);
+        // js_free_rt(rt, native_print);
     }
 }
 
@@ -52,49 +63,55 @@ fn js_printclass_constructor2_inner<'a>(
 ) -> Result<JSValue, ez_quick_js::common::Error> {
     println!("PrintClass constructor is called");
 
-    let is_exception = Cell::new(false);
-
+    // let is_exception = Cell::new(false);
+    //
     // 生成 native 对象
-    let native_print =
-        unsafe { js_malloc(ctx.inner, size_of::<PrintClass>()) } as *const PrintClass;
-    if native_print == null_mut() {
-        Err(ez_quick_js::common::Error::GeneralError(
-            "js_malloc() is failed when alloc print class".to_owned(),
-        ))?
-    }
-
+    // let native_print = {
+    //     let val = unsafe { js_malloc(ctx.inner, size_of::<PrintClass>()) } as *const PrintClass;
+    //     if val == null_mut() {
+    //         Err(ez_quick_js::common::Error::GeneralError(
+    //             "js_malloc() is failed when alloc print class".to_owned(),
+    //         ))?
+    //     }
+    // };
+    //
     // 发生异常时，释放 native_print
-    scopeguard::defer!(unsafe {
-        if is_exception.get() {
-            js_free(ctx.inner, native_print as _);
-            println!("js_free native_print")
-        }
-    });
+    // scopeguard::defer!(unsafe {
+    //     if is_exception.get() {
+    //         js_free(ctx.inner, native_print as _);
+    //         println!("js_free native_print");
+    //     }
+    // });
+
+    let mut native_print = Box::new(Cell::new(PrintClass { val: 0 }));
 
     if args.len() > 0 {
         let val = args[0].clone().to_int()?.value();
-        unsafe {
-            (*(native_print as *mut PrintClass)).val = val;
-        }
+        // unsafe { (*(native_print as *mut PrintClass)).val = val; }
+        native_print.get_mut().val = val;
     }
 
     // 获取 new_target 的 prototype
-    let proto = new_target.get_property("prototype")
+    let proto = new_target
+        .get_property("prototype")
         .ok_or(ez_quick_js::common::Error::GeneralError(
             "JS_GetPropertyStr() is failed when get 'prototype'".to_owned(),
-        )).map_err(|err| {
-            is_exception.set(true);
+        ))
+        .map_err(|err| {
+            // is_exception.set(true);
             err
         })?;
 
     let cls_id = unsafe { PRINT_CLASS_ID };
     let js_print_obj =
-        new_object_proto_class(ctx, &proto /* 也可以设为 JS_NULL */, cls_id).map_err(|err| {
-            is_exception.set(true);
+        new_object_proto_class(ctx, &proto /*也可以设为 JS_NULL*/, cls_id).map_err(|err| {
+            // is_exception.set(true);
             err
         })?;
 
-    js_print_obj.set_opaque(native_print as _);
+    // 没有发生异常，则不释放 native_print
+    js_print_obj.set_opaque(Box::into_raw(native_print) as _);
+    // js_print_obj.set_opaque(native_print as _);
 
     Ok(unsafe { js_print_obj.forget() })
 }
@@ -136,12 +153,12 @@ unsafe extern "C" fn js_print_test_func(
     _argc: ::std::os::raw::c_int,
     _argv: *mut JSValue,
 ) -> JSValue {
-    let native_print: *mut PrintClass = JS_GetOpaque2(ctx, this_val, PRINT_CLASS_ID) as _;
+    let native_print = JS_GetOpaque2(ctx, this_val, PRINT_CLASS_ID) as *mut Cell<PrintClass>;
+
     if native_print == null_mut() {
         return JS_EXCEPTION;
     }
-
-    println!("Print Value: {}", (*native_print).val);
+    println!("Print Value ~: {}", (*native_print).get_mut().val);
 
     JS_UNDEFINED
 }
@@ -149,13 +166,14 @@ unsafe extern "C" fn js_print_test_func(
 unsafe extern "C" fn js_print_val_getter(ctx: *mut JSContext, this_val: JSValue) -> JSValue {
     let ctx = Context::from_raw(ctx);
 
-    let native_print: *mut PrintClass = JS_GetOpaque2(ctx.inner, this_val, PRINT_CLASS_ID) as _;
+    let native_print = JS_GetOpaque2(ctx.inner, this_val, PRINT_CLASS_ID) as *mut Cell<PrintClass>;
+
     if native_print == null_mut() {
         ctx.forget();
         return JS_EXCEPTION;
     }
 
-    let val = ctx.get_int((*native_print).val).forget();
+    let val = ctx.get_int((*native_print).get_mut().val).forget();
     ctx.forget();
 
     println!("Print val getter is called");

@@ -1,4 +1,5 @@
 use std::ffi::CString;
+use std::cell::{Cell, RefCell};
 
 use super::Error;
 
