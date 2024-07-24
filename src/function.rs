@@ -486,13 +486,19 @@ pub fn set_class_proto(ctx: &Context, class_id: JSClassID, obj: &JsValue) -> Res
     Ok(())
 }
 
+/// 用 proto 对应的 shape 生成一个新 JS 实例对象，
+/// 该对象的 class_id 为 print_class_id, prototype 为 proto
 pub fn new_object_proto_class<'a>(
     ctx: &'a Context,
     proto: &JsValue,
     class_id: JSClassID,
-) -> JsValue<'a> {
+) -> Result<JsValue<'a>, Error >{
     let val = unsafe { JS_NewObjectProtoClass(ctx.inner, proto.inner, class_id) };
-    JsValue::new(ctx, val)
+    let val = JsValue::new(ctx, val);
+
+    assert_exception(ctx, &val, "new_object_proto_class() is failed")?;
+
+    Ok(val)
 }
 
 #[cfg(test)]

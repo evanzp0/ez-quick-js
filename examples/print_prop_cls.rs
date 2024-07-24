@@ -5,9 +5,8 @@ use std::ptr::null_mut;
 
 use anyhow::Error;
 use ez_quick_js::ffi::{
-    js_free, js_free_rt, js_malloc, js_to_string, JSClassDef,
-    JSClassID, JSRuntime, JS_GetOpaque, JS_GetOpaque2,
-    JS_EVAL_TYPE_GLOBAL, JS_TAG_INT,
+    js_free, js_free_rt, js_malloc, js_to_string, JSClassDef, JSClassID, JSRuntime, JS_GetOpaque,
+    JS_GetOpaque2, JS_EVAL_TYPE_GLOBAL, JS_TAG_INT,
 };
 use ez_quick_js::function::{
     new_c_function2, new_class, new_class_id, new_object_proto_class, set_class_proto,
@@ -42,6 +41,7 @@ const PRINT_CLASS_DEF: JSClassDef = JSClassDef {
     exotic: std::ptr::null_mut(),
 };
 
+#[allow(unused_assignments)]
 /// PrintClass constructor 的主逻辑，返回值为一个 Print （JSValue）实例对象，
 /// 并将该对象和 native 对象关联
 fn js_printclass_constructor2_inner<'a>(
@@ -51,19 +51,25 @@ fn js_printclass_constructor2_inner<'a>(
 ) -> Result<JSValue, ez_quick_js::common::Error> {
     println!("PrintClass constructor is called");
 
+    let mut is_exception = false;
+    let is_exception_ptr = &is_exception as *const _; // 让 defer 能引用到 is_exception
+
     // 生成 native 对象
     let native_print =
         unsafe { js_malloc(ctx.inner, size_of::<PrintClass>()) } as *const PrintClass;
     if native_print == null_mut() {
-        unsafe { js_free(ctx.inner, native_print as _) };
         Err(ez_quick_js::common::Error::GeneralError(
             "js_malloc() is failed when alloc print class".to_owned(),
         ))?
     }
 
-    // defer!(unsafe {
-    //     js_free(ctx.inner, native_print as _);
-    // });
+    // 发生异常时，释放 native_print
+    scopeguard::defer!(unsafe {
+        if *is_exception_ptr {
+            js_free(ctx.inner, native_print as _);
+            println!("js_free native_print")
+        }
+    });
 
     if args.len() > 0 {
         let val = args[0].clone().to_int()?.value();
@@ -73,23 +79,21 @@ fn js_printclass_constructor2_inner<'a>(
     }
 
     // 获取 new_target 的 prototype
-    let proto = {
-        let tmp = new_target
-            .get_property("prototype")
-            .ok_or(ez_quick_js::common::Error::GeneralError(
-                "JS_GetPropertyStr() is failed when get 'prototype'".to_owned(),
-            ));
-        if let Err(err) = tmp {
-            unsafe { js_free(ctx.inner, native_print as _) };
-            Err(err)?
-        } else {
-            tmp.unwrap()
-        }
-    };
+    let proto = new_target.get_property("prototype")
+        .ok_or(ez_quick_js::common::Error::GeneralError(
+            "JS_GetPropertyStr() is failed when get 'prototype'".to_owned(),
+        )).map_err(|err| {
+            is_exception = true;
+            err
+        })?;
 
     let cls_id = unsafe { PRINT_CLASS_ID };
     let js_print_obj =
-        new_object_proto_class(ctx, &proto /* 也可以设为 JS_NULL */, cls_id);
+        new_object_proto_class(ctx, &proto /* 也可以设为 JS_NULL */, cls_id).map_err(|err| {
+            is_exception = true;
+            err
+        })?;
+
     js_print_obj.set_opaque(native_print as _);
 
     Ok(unsafe { js_print_obj.forget() })
@@ -281,7 +285,6 @@ unsafe extern "C" fn js_print(
 
     JS_UNDEFINED
 }
-
 
 ///// Print 构造函数, 返回值为一个 Print （JsValue）实例对象，并将该和 native 对象关联
 // unsafe extern "C" fn js_printclass_constructor(
