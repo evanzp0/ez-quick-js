@@ -67,6 +67,7 @@ fn js_printclass_constructor2_inner<'a>(
     //
     // 生成 native 对象
     // let native_print = {
+    //     // js_malloc() 是在 JS 内部堆上分配内存，受到 JS Runtime 堆容量的限制(默认是无限大小)
     //     let val = unsafe { js_malloc(ctx.inner, size_of::<PrintClass>()) } as *const PrintClass;
     //     if val == null_mut() {
     //         Err(ez_quick_js::common::Error::GeneralError(
