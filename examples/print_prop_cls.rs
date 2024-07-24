@@ -49,10 +49,10 @@ impl PrintClass {
 }
 
 /// JS 类相关 (class_id, 析构函数, class定义)
-static mut PRINT_CLASS_ID: JSClassID = 0;
+const PRINT_CLASS_ID: Cell<JSClassID> = Cell::new(0);
 
 unsafe extern "C" fn js_print_cls_finalizer(_rt: *mut JSRuntime, val: JSValue) {
-    let native_print = JS_GetOpaque(val, PRINT_CLASS_ID) as *mut PrintClass;
+    let native_print = JS_GetOpaque(val, PRINT_CLASS_ID.get()) as *mut PrintClass;
 
     println!(
         "js_print_cls_finalizer run: {}",
@@ -115,7 +115,7 @@ unsafe extern "C" fn js_printclass_constructor(
         let obj = JS_NewObjectProtoClass(
             ctx,
             proto, /* 也可以设为 JS_NULL */
-            PRINT_CLASS_ID,
+            PRINT_CLASS_ID.get(),
         );
         js_free_value(ctx, proto);
 
@@ -140,7 +140,7 @@ unsafe extern "C" fn js_print_test_func(
 ) -> JSValue {
     // 获取 native 对象
     let native_print = {
-        let tmp = JS_GetOpaque2(ctx, this_val, PRINT_CLASS_ID) as *mut PrintClass;
+        let tmp = JS_GetOpaque2(ctx, this_val, PRINT_CLASS_ID.get()) as *mut PrintClass;
         if tmp == null_mut() {
             return JS_EXCEPTION;
         }
@@ -159,7 +159,7 @@ fn native_print_test_func(print: &PrintClass) {
 unsafe extern "C" fn js_print_val_getter(ctx: *mut JSContext, this_val: JSValue) -> JSValue {
     // 获取 native 对象
     let native_print = {
-        let tmp = JS_GetOpaque2(ctx, this_val, PRINT_CLASS_ID) as *mut PrintClass;
+        let tmp = JS_GetOpaque2(ctx, this_val, PRINT_CLASS_ID.get()) as *mut PrintClass;
         if tmp == null_mut() {
             return JS_EXCEPTION;
         }
@@ -184,7 +184,7 @@ unsafe extern "C" fn js_print_val_setter(
     this_val: JSValue,
     val: JSValue,
 ) -> JSValue {
-    let native_print: *mut PrintClass = JS_GetOpaque2(ctx, this_val, PRINT_CLASS_ID) as _;
+    let native_print: *mut PrintClass = JS_GetOpaque2(ctx, this_val, PRINT_CLASS_ID.get()) as _;
     if native_print == null_mut() {
         return JS_EXCEPTION;
     }
@@ -210,6 +210,7 @@ fn native_print_val_setter(print: &mut PrintClass, val: i32) {
     print.set_val(val);
 }
 
+/// JS 函数列表, 用来添加到 JS Ojbect 上
 const JS_PRINT_FUNCS: &[JSCFunctionListEntry] = &[
     C_FUNC_DEF(b"PrintTestFunc\0", 1, Some(js_print_test_func)),
     C_GET_SET_DEF(
@@ -219,10 +220,10 @@ const JS_PRINT_FUNCS: &[JSCFunctionListEntry] = &[
     ),
 ];
 
-#[allow(static_mut_refs)]
+#[allow(const_item_mutation)]
 /// 在全局对象上注册 "Print" 类构造器
 fn init_register_class(ctx: &Context, global_obj: &JsValue) -> Result<(), Error> {
-    let class_id = unsafe { new_class_id(&mut PRINT_CLASS_ID) };
+    let class_id = new_class_id(PRINT_CLASS_ID.get_mut());
     new_class(ctx, class_id, &PRINT_CLASS_DEF)?;
 
     // 生成一个 JS Prototype 对象
