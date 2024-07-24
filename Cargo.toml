@@ -10,3 +10,4 @@ copy_dir = "0.1.3"
 [dependencies]
 thiserror = "1.0.63"
 anyhow = "1.0.86"
+once_cell = "1.19.0"

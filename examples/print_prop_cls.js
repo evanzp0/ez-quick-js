@@ -5,5 +5,3 @@ print_obj.PrintTestFunc();
 print_obj.val = 13;
 
 console.log(print_obj.val);
-
-console.log("!!!!!!!!!!!!");
