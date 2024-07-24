@@ -5,8 +5,7 @@ use std::ptr::null_mut;
 
 use anyhow::Error;
 use ez_quick_js::ffi::{
-    js_to_string, JSClassDef, JSClassID, JSRuntime, JS_GetOpaque, JS_GetOpaque2,
-    JS_EVAL_TYPE_GLOBAL, JS_TAG_INT,
+    js_to_string, JSClassDef, JSClassID, JSRuntime, JS_GetOpaque, JS_GetOpaque2, JS_ToInt32, JS_EVAL_TYPE_GLOBAL, JS_TAG_INT
 };
 use ez_quick_js::function::{
     new_c_function2, new_class, new_class_id, new_object_proto_class, set_class_proto,
@@ -16,7 +15,7 @@ use ez_quick_js::{
     ffi::{JSCFunctionListEntry, JSContext, JSValue},
     Context, Runtime,
 };
-use ez_quick_js::{JsInteger, JsValue, JS_EXCEPTION, JS_NULL, JS_UNDEFINED};
+use ez_quick_js::{JsValue, JS_EXCEPTION, JS_NULL, JS_UNDEFINED};
 
 #[derive(Debug, Clone)]
 struct PrintClass {
@@ -26,6 +25,12 @@ struct PrintClass {
 impl Drop for PrintClass {
     fn drop(&mut self) {
         println!("PrintClass is drop");
+    }
+}
+
+impl PrintClass {
+    pub fn set_val(&mut self, val: i32) {
+        self.val = val;
     }
 }
 
@@ -187,28 +192,30 @@ unsafe extern "C" fn js_print_val_setter(
     this_val: JSValue,
     val: JSValue,
 ) -> JSValue {
-    let ctx = Context::from_raw(ctx);
-
-    let native_print: *mut PrintClass = JS_GetOpaque2(ctx.inner, this_val, PRINT_CLASS_ID) as _;
+    let native_print: *mut PrintClass = JS_GetOpaque2(ctx, this_val, PRINT_CLASS_ID) as _;
     if native_print == null_mut() {
-        ctx.forget();
         return JS_EXCEPTION;
     }
 
+    let mut param = 0;
     if val.tag != JS_TAG_INT.into() {
-        ctx.forget();
         return JS_EXCEPTION;
     } else {
-        let val = JsValue::new(&ctx, val);
-        let val: JsInteger = val.try_into().unwrap();
-        (*native_print).val = val.value();
+        if JS_ToInt32(ctx, &mut param, val) != 0 {
+            return JS_EXCEPTION;
+        } 
     }
 
-    ctx.forget();
+    // 调用 native 方法
+    print_val_setter(native_print.as_mut().unwrap(),  param);
 
     println!("Print val setter is called");
 
     return JS_UNDEFINED;
+}
+
+fn print_val_setter(print: &mut PrintClass, val: i32) {
+    print.set_val(val);
 }
 
 const JS_PRINT_FUNCS: &[JSCFunctionListEntry] = &[
@@ -351,4 +358,33 @@ unsafe extern "C" fn js_print(
 //     js_free_value(ctx, proto);
 
 //     js_print_obj
+// }
+// 
+// unsafe extern "C" fn js_print_val_setter(
+//     ctx: *mut JSContext,
+//     this_val: JSValue,
+//     val: JSValue,
+// ) -> JSValue {
+//     let ctx = Context::from_raw(ctx);
+
+//     let native_print: *mut PrintClass = JS_GetOpaque2(ctx.inner, this_val, PRINT_CLASS_ID) as _;
+//     if native_print == null_mut() {
+//         ctx.forget();
+//         return JS_EXCEPTION;
+//     }
+
+//     if val.tag != JS_TAG_INT.into() {
+//         ctx.forget();
+//         return JS_EXCEPTION;
+//     } else {
+//         let val = JsValue::new(&ctx, val);
+//         let val: JsInteger = val.try_into().unwrap();
+//         (*native_print).val = val.value();
+//     }
+
+//     ctx.forget();
+
+//     println!("Print val setter is called");
+
+//     return JS_UNDEFINED;
 // }
