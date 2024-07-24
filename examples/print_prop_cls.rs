@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::ffi::CStr;
 use std::fs;
 use std::mem::size_of;
@@ -51,8 +52,7 @@ fn js_printclass_constructor2_inner<'a>(
 ) -> Result<JSValue, ez_quick_js::common::Error> {
     println!("PrintClass constructor is called");
 
-    let mut is_exception = false;
-    let is_exception_ptr = &is_exception as *const _; // 让 defer 能引用到 is_exception
+    let is_exception = Cell::new(false);
 
     // 生成 native 对象
     let native_print =
@@ -65,7 +65,7 @@ fn js_printclass_constructor2_inner<'a>(
 
     // 发生异常时，释放 native_print
     scopeguard::defer!(unsafe {
-        if *is_exception_ptr {
+        if is_exception.get() {
             js_free(ctx.inner, native_print as _);
             println!("js_free native_print")
         }
@@ -83,14 +83,14 @@ fn js_printclass_constructor2_inner<'a>(
         .ok_or(ez_quick_js::common::Error::GeneralError(
             "JS_GetPropertyStr() is failed when get 'prototype'".to_owned(),
         )).map_err(|err| {
-            is_exception = true;
+            is_exception.set(true);
             err
         })?;
 
     let cls_id = unsafe { PRINT_CLASS_ID };
     let js_print_obj =
         new_object_proto_class(ctx, &proto /* 也可以设为 JS_NULL */, cls_id).map_err(|err| {
-            is_exception = true;
+            is_exception.set(true);
             err
         })?;
 
