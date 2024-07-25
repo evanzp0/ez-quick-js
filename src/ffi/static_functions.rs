@@ -241,9 +241,26 @@ pub fn JS_Equal(ctx: *mut JSContext, one: &JSValue, other: &JSValue) -> bool {
     }
 }
 
+pub const fn JS_MKVAL(tag: i32, val: i32) -> JSValue {
+    JSValue {
+        u: JSValueUnion { int32: val },
+        tag: tag as _,
+    }
+}
+
+pub fn JS_MKPTR(tag: i32, ptr: *mut std::ffi::c_void) -> JSValue {
+    JSValue {
+        u: JSValueUnion { ptr },
+        tag: tag as _,
+    }
+}
+
+pub unsafe fn JS_VALUE_GET_PTR(v: JSValue) -> *mut ::std::os::raw::c_void {
+    v.u.ptr
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{Context, JsInteger, Runtime};
     use std::ffi::CStr;
 
     use super::*;

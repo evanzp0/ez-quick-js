@@ -342,7 +342,6 @@ pub fn add_module_export(
     export_name: *const c_char,
 ) -> Result<(), Error> {
     let name = unsafe { CStr::from_ptr(export_name) };
-    println!("{:?}", name);
     let res = unsafe { JS_AddModuleExport(ctx.inner, module.raw_value(), export_name) };
 
     if res == 0 {

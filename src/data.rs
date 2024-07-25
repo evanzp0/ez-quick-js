@@ -4,7 +4,7 @@ use crate::{
     common::{make_cstring, Error},
     ffi::{
         JSContext, JSRefCountHeader, JSValue, JSValueUnion, JS_DupValue, JS_FreeValue,
-        JS_NewFloat64, JS_NewInt32, JS_NewString, JS_ToF64, JS_ToI32, JS_ATOM_NULL,
+        JS_NewFloat64, JS_NewInt32, JS_NewString, JS_ToF64, JS_ToI32, JS_ATOM_NULL, JS_MKVAL,
         JS_TAG_EXCEPTION, JS_TAG_NULL, JS_TAG_UNDEFINED,
     },
     function::{get_last_exception, run_compiled_function, to_bytecode},
@@ -404,20 +404,6 @@ impl JsTag {
     #[inline]
     pub fn is_compiled_function(&self) -> bool {
         matches!(self, Self::FunctionBytecode)
-    }
-}
-
-pub const fn JS_MKVAL(tag: i32, val: i32) -> JSValue {
-    JSValue {
-        u: JSValueUnion { int32: val },
-        tag: tag as _,
-    }
-}
-
-pub fn JS_MKPTR(tag: i32, ptr: *mut c_void) -> JSValue {
-    JSValue {
-        u: JSValueUnion { ptr },
-        tag: tag as _,
     }
 }
 
