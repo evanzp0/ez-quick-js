@@ -251,14 +251,11 @@ mod tests {
     #[test]
     fn test_to_fn() {
         unsafe {
-            let rt = Runtime::new(None);
-            let ctx = &Context::new(rt);
-            let js_int = JsInteger::new(ctx, 12);
-            let js_val = js_int.to_value();
-            let mut ret_val = 0_u32;
-            let rst = JS_ToI32(ctx.inner, js_val.inner);
-
-            assert_eq!(12, rst);
+            let rt = JS_NewRuntime();
+            let ctx = JS_NewContext(rt);
+            let js_int = JS_NewInt32(ctx, 12);
+            let val = JS_ToI32(ctx, js_int);
+            assert_eq!(12, val);
         }
     }
 

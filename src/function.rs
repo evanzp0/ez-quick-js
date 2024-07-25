@@ -516,7 +516,7 @@ mod tests {
     #[test]
     fn test_compile_and_run() {
         let rt = Runtime::default();
-        let ctx = &Context::new(rt);
+        let ctx = &Context::new(&rt);
 
         let script = "{let a = 7; let b = 5; a * b;}";
         let js_compiled_val: JsCompiledFunction =

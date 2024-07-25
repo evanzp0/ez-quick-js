@@ -1,18 +1,23 @@
 use crate::{
-    common::Error, ffi::{
-        JS_NewObjectWithProto, JSCFunction, JSContext, JSModuleInitFunc, JS_FreeContext, JS_FreeRuntime, JS_GetRuntime, JS_NewContext, 
-    }, function::{
+    common::Error,
+    ffi::{
+        JSCFunction, JSContext, JSModuleInitFunc, JS_FreeContext, JS_FreeRuntime, JS_GetRuntime,
+        JS_NewContext, JS_NewObjectWithProto,
+    },
+    function::{
         get_global_object, js_eval, new_atom, new_c_function, new_c_module, new_object_with_proto,
-    }, CFunctionInner, JsAtom, JsBoolean, JsInteger, JsModuleDef, JsNumber, JsString, JsValue, Runtime, JS_NULL, JS_UNDEFINED
+    },
+    CFunctionInner, JsAtom, JsBoolean, JsInteger, JsModuleDef, JsNumber, JsString, JsValue,
+    Runtime, JS_NULL, JS_UNDEFINED,
 };
 
-pub struct Context {
-    runtime: Runtime,
+pub struct Context<'a> {
+    runtime: &'a Runtime,
     pub inner: *mut JSContext,
 }
 
-impl Context {
-    pub fn new(runtime: Runtime) -> Self {
+impl<'a> Context<'a> {
+    pub fn new(runtime: &'a Runtime) -> Self {
         let inner = unsafe { JS_NewContext(runtime.inner) };
         if inner.is_null() {
             panic!("Context create failed");
@@ -67,7 +72,7 @@ impl Context {
         new_atom(self, name)
     }
 
-    pub fn eval<'a>(
+    pub fn eval(
         &'a self,
         code: &str,
         file_name: &str,
@@ -106,7 +111,7 @@ impl Context {
     }
 }
 
-impl Drop for Context {
+impl<'a> Drop for Context<'a> {
     fn drop(&mut self) {
         unsafe { JS_FreeContext(self.inner) }
     }

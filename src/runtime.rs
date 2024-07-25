@@ -27,7 +27,7 @@ impl Runtime {
         Self { inner: js_runtime }
     }
 
-    pub fn create_context(self) -> Context {
+    pub fn create_context<'a>(&'a self) -> Context<'a> {
         Context::new(self)
     }
 }

@@ -3,8 +3,8 @@ use std::ffi::c_void;
 use crate::{
     common::{make_cstring, Error},
     ffi::{
-        JS_DupValue, JS_FreeValue, JS_NewFloat64, JS_NewInt32, JS_NewString, JS_ToF64,
-        JS_ToI32, JSContext, JSRefCountHeader, JSValue, JSValueUnion, JS_ATOM_NULL,
+        JSContext, JSRefCountHeader, JSValue, JSValueUnion, JS_DupValue, JS_FreeValue,
+        JS_NewFloat64, JS_NewInt32, JS_NewString, JS_ToF64, JS_ToI32, JS_ATOM_NULL,
         JS_TAG_EXCEPTION, JS_TAG_NULL, JS_TAG_UNDEFINED,
     },
     function::{get_last_exception, run_compiled_function, to_bytecode},
@@ -27,7 +27,7 @@ pub const JS_EXCEPTION: JSValue = JS_MKVAL(JS_TAG_EXCEPTION, 0);
 macro_rules! struct_type {
     ($type:ident) => {
         pub struct $type<'a> {
-            pub(crate) ctx: &'a crate::Context,
+            pub(crate) ctx: &'a crate::Context<'a>,
             pub(crate) inner: JSValue,
         }
     };
@@ -437,7 +437,7 @@ impl JsModuleDef {
 }
 
 pub struct JsAtom<'a> {
-    pub(crate) ctx: &'a crate::Context,
+    pub(crate) ctx: &'a crate::Context<'a>,
     pub(crate) inner: crate::ffi::JSAtom,
 }
 
@@ -636,9 +636,9 @@ impl<'a> JsValue<'a> {
         let prop_name = self.ctx.new_atom(prop_name)?;
         crate::function::define_property(self.ctx, self, prop_name, prop_value, flags)
     }
-    
+
     pub fn set_opaque(&self, opaque: *mut ::std::os::raw::c_void) {
-        unsafe {crate::ffi::JS_SetOpaque(self.inner, opaque)}
+        unsafe { crate::ffi::JS_SetOpaque(self.inner, opaque) }
     }
 
     is_fn!(is_undefined);
@@ -711,11 +711,7 @@ impl_clone!(JsArray);
 impl_try_from!(JsValue for JsArray if v => v.is_array());
 
 struct_type!(JsObject);
-impl_type_common_fn!(
-    JsObject,
-    Option<JSValue>,
-    crate::ffi::JS_NewObjectWithProto
-);
+impl_type_common_fn!(JsObject, Option<JSValue>, crate::ffi::JS_NewObjectWithProto);
 impl<'a> std::fmt::Debug for JsObject<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("JsObject")
@@ -897,7 +893,7 @@ mod tests {
     #[test]
     fn test_data() {
         let rt = Runtime::default();
-        let ctx = &Context::new(rt);
+        let ctx = &Context::new(&rt);
 
         let val_1 = JsInteger::new(ctx, 2);
         let val_2 = JsInteger::new(ctx, 2);

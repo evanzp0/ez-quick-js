@@ -302,7 +302,9 @@ fn main() -> Result<(), Error> {
     let code = &fs::read_to_string(file_name)?;
     // println!("{code}");
 
-    let ctx = &Runtime::new(None).create_context();
+    let rt = Runtime::new(None);
+    let ctx = &rt.create_context();
+
 
     init_module(ctx, "_G")?;
     add_global_print(ctx);

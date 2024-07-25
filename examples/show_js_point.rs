@@ -1,7 +1,10 @@
 use std::fs;
 
 use ez_quick_js::{
-    ffi::{JSContext, JSValue, JS_GetPropertyStr, JS_NewInt32, JS_ToI32, JS_ToStr, JS_EVAL_TYPE_GLOBAL, JS_PROP_C_W_E},
+    ffi::{
+        JSContext, JSValue, JS_GetPropertyStr, JS_NewInt32, JS_ToI32, JS_ToStr,
+        JS_EVAL_TYPE_GLOBAL, JS_PROP_C_W_E,
+    },
     function::call_function,
     Context, JsValue, Runtime, JS_UNDEFINED,
 };
@@ -51,7 +54,7 @@ fn get_point_from_js(ctx: *mut JSContext, this_obj: JSValue) -> Point {
         let val = JS_GetPropertyStr(ctx, this_obj, p_name_x.as_ptr() as _);
         JS_ToI32(ctx, val)
     };
-    let y = unsafe { 
+    let y = unsafe {
         let val = JS_GetPropertyStr(ctx, this_obj, p_name_y.as_ptr() as _);
         JS_ToI32(ctx, val)
     };
@@ -83,7 +86,7 @@ unsafe extern "C" fn point_multiple(
         let val = point.x * point.y;
         JS_NewInt32(ctx, val)
     };
-    
+
     val
 }
 

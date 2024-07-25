@@ -10,7 +10,8 @@ fn main() {
     let code = fs::read_to_string(file_name).unwrap();
     println!("{file_name}:\n{code}\n------------");
 
-    let ctx = &Runtime::new(None).create_context();
+    let rt = Runtime::new(None);
+    let ctx = &rt.create_context();
 
     add_global_print(ctx);
 
