@@ -38,6 +38,8 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 
     fn JS_Find_Atom_real(ctx: *mut JSContext, name: *const c_char) -> JSAtom ;
+    fn Find_Export_Entry_real(ctx: *mut JSContext, m: *mut JSModuleDef, export_name: JSAtom) -> *mut JSExportEntry;
+    fn JS_Find_Loaded_Module_real(ctx: *mut JSContext, name: JSAtom) -> *mut JSModuleDef;
 }
 
 /// Increment the refcount of this value
@@ -257,6 +259,14 @@ pub fn JS_MKPTR(tag: i32, ptr: *mut std::ffi::c_void) -> JSValue {
 
 pub unsafe fn JS_VALUE_GET_PTR(v: JSValue) -> *mut ::std::os::raw::c_void {
     v.u.ptr
+}
+
+pub unsafe fn Find_Export_Entry(ctx: *mut JSContext, m: *mut JSModuleDef, export_name: JSAtom)  -> *mut JSExportEntry {
+    Find_Export_Entry_real(ctx, m, export_name)
+}
+
+pub unsafe fn JS_Find_Loaded_Module(ctx: *mut JSContext, name: JSAtom) -> *mut JSModuleDef {
+    JS_Find_Loaded_Module_real(ctx, name)
 }
 
 #[cfg(test)]

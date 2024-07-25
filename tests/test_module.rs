@@ -5,19 +5,20 @@ use std::ptr::null_mut;
 
 use anyhow::Error;
 use ez_quick_js::ffi::{
-    JSCFunctionEnum_JS_CFUNC_constructor, JSClassDef, JSClassID, JSModuleDef, JSRuntime,
-    JS_AtomToString, JS_FreeValue, JS_GetModuleName, JS_GetOpaque, JS_GetOpaque2,
-    JS_GetPropertyStr, JS_GetRuntime, JS_IsException, JS_NewCFunction2,
-    JS_NewClass, JS_NewInt32, JS_NewObject, JS_NewObjectProtoClass, JS_SetClassProto,
-    JS_SetConstructor, JS_SetModuleExport, JS_SetOpaque, JS_SetPropertyFunctionList, JS_ToInt32,
-    JS_ToStr, JS_EVAL_TYPE_GLOBAL, JS_EVAL_TYPE_MODULE, JS_TAG_INT, JS_VALUE_GET_PTR,
+    Find_Export_Entry, JSCFunctionEnum_JS_CFUNC_constructor, JSClassDef, JSClassID, JSModuleDef,
+    JSRuntime, JS_AtomToString, JS_Find_Loaded_Module, JS_FreeValue, JS_GetModuleName,
+    JS_GetOpaque, JS_GetOpaque2, JS_GetPropertyStr, JS_GetRuntime, JS_IsException, JS_NewAtomLen,
+    JS_NewCFunction2, JS_NewClass, JS_NewInt32, JS_NewObject, JS_NewObjectProtoClass,
+    JS_PromiseResult, JS_PromiseState, JS_SetClassProto, JS_SetConstructor, JS_SetModuleExport,
+    JS_SetOpaque, JS_SetPropertyFunctionList, JS_ToInt32, JS_ToStr, JS_EVAL_TYPE_GLOBAL,
+    JS_EVAL_TYPE_MODULE, JS_TAG_INT, 
 };
 use ez_quick_js::function::{add_module_export, new_class_id, C_FUNC_DEF, C_GET_SET_DEF};
 use ez_quick_js::{
     ffi::{JSCFunctionListEntry, JSContext, JSValue},
     Context, Runtime,
 };
-use ez_quick_js::{JsModuleDef, JS_EXCEPTION, JS_UNDEFINED};
+use ez_quick_js::{JsModuleDef, JsValue, JS_EXCEPTION, JS_UNDEFINED};
 use once_cell::sync::Lazy;
 
 #[derive(Debug, Clone)]
@@ -297,16 +298,46 @@ fn test_module() -> Result<(), Error> {
         println!("{}", m_str);
     }
 
-    let rst = ctx.eval(
+    let rst_promise = ctx.eval(
         code,
-        file_name,
+        "ff",
         (JS_EVAL_TYPE_GLOBAL | JS_EVAL_TYPE_MODULE) as i32,
     )?;
+    assert!(rst_promise.is_object());
 
-    assert!(rst.is_object());
+    let state = unsafe { JS_PromiseState(ctx.inner, *rst_promise.raw_value()) };
+    println!("state = {}", state);
 
-    let m = unsafe { JS_VALUE_GET_PTR(*rst.raw_value()) };
-    println!("{:p}", m);
+    let s = unsafe { JS_PromiseResult(ctx.inner, *rst_promise.raw_value()) };
+    unsafe {
+        println!("promise_result = {:p}", s.u.ptr);
+    }
+
+    let ff_module = unsafe {
+        let ff_atom = JS_NewAtomLen(ctx.inner, b"ff\0".as_ptr() as _, 2);
+        JS_Find_Loaded_Module(ctx.inner, ff_atom)
+    };
+    let ret_val = unsafe {
+        let ret_atom = JS_NewAtomLen(ctx.inner, b"ret_val\0".as_ptr() as _, 7);
+        Find_Export_Entry(ctx.inner, ff_module, ret_atom as _)
+    };
+    unsafe {
+        println!("ff_module = {:p}", ff_module);
+        println!("ret_val.export_name = {}", (*ret_val).export_name);
+        println!(
+            "ret_val.pvalue = {:p}",
+            (*(*ret_val).u.local.var_ref).pvalue
+        );
+        println!(
+            "ret_val.ret_val.tag = {}",
+            (*(*(*ret_val).u.local.var_ref).pvalue).tag
+        );
+        let ret_val = JsValue::new(ctx, *(*(*ret_val).u.local.var_ref).pvalue);
+        let ret_val = ret_val.to_int().unwrap().value();
+
+        println!("ret_val in module: {}", ret_val);
+        assert_eq!(40, ret_val);
+    }
 
     Ok(())
 }

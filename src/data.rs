@@ -15,6 +15,7 @@ pub type JSCGetter =
 pub type JSCSetter =
     Option<unsafe extern "C" fn(ctx: *mut JSContext, this_val: JSValue, val: JSValue) -> JSValue>;
 
+pub const JS_CLASS_PROMISE: u32 = 45;
 pub const JS_NULL: JSValue = JS_MKVAL(JS_TAG_NULL, 0);
 pub const JS_NULL_PTR: *mut crate::ffi::JSValue = std::ptr::null_mut();
 pub const NULL_SIZE: *mut usize = std::ptr::null_mut();

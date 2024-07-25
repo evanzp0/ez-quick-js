@@ -320,64 +320,64 @@ struct JSClass {
 #define JS_MODE_MATH   (1 << 2)
 #define JS_MODE_ASYNC  (1 << 3) /* async function */
 
-typedef struct JSStackFrame {
-    struct JSStackFrame *prev_frame; /* NULL if first stack frame */
-    JSValue cur_func; /* current function, JS_UNDEFINED if the frame is detached */
-    JSValue *arg_buf; /* arguments */
-    JSValue *var_buf; /* variables */
-    struct list_head var_ref_list; /* list of JSVarRef.var_ref_link */
-    const uint8_t *cur_pc; /* only used in bytecode functions : PC of the
-                        instruction after the call */
-    int arg_count;
-    int js_mode; /* for C functions, only JS_MODE_MATH may be set */
-    /* only used in generators. Current stack pointer value. NULL if
-       the function is running. */ 
-    JSValue *cur_sp;
-} JSStackFrame;
+// typedef struct JSStackFrame {
+//     struct JSStackFrame *prev_frame; /* NULL if first stack frame */
+//     JSValue cur_func; /* current function, JS_UNDEFINED if the frame is detached */
+//     JSValue *arg_buf; /* arguments */
+//     JSValue *var_buf; /* variables */
+//     struct list_head var_ref_list; /* list of JSVarRef.var_ref_link */
+//     const uint8_t *cur_pc; /* only used in bytecode functions : PC of the
+//                         instruction after the call */
+//     int arg_count;
+//     int js_mode; /* for C functions, only JS_MODE_MATH may be set */
+//     /* only used in generators. Current stack pointer value. NULL if
+//        the function is running. */ 
+//     JSValue *cur_sp;
+// } JSStackFrame;
 
-typedef enum {
-    JS_GC_OBJ_TYPE_JS_OBJECT,
-    JS_GC_OBJ_TYPE_FUNCTION_BYTECODE,
-    JS_GC_OBJ_TYPE_SHAPE,
-    JS_GC_OBJ_TYPE_VAR_REF,
-    JS_GC_OBJ_TYPE_ASYNC_FUNCTION,
-    JS_GC_OBJ_TYPE_JS_CONTEXT,
-} JSGCObjectTypeEnum;
+// typedef enum {
+//     JS_GC_OBJ_TYPE_JS_OBJECT,
+//     JS_GC_OBJ_TYPE_FUNCTION_BYTECODE,
+//     JS_GC_OBJ_TYPE_SHAPE,
+//     JS_GC_OBJ_TYPE_VAR_REF,
+//     JS_GC_OBJ_TYPE_ASYNC_FUNCTION,
+//     JS_GC_OBJ_TYPE_JS_CONTEXT,
+// } JSGCObjectTypeEnum;
 
-/* header for GC objects. GC objects are C data structures with a
-   reference count that can reference other GC objects. JS Objects are
-   a particular type of GC object. */
-struct JSGCObjectHeader {
-    int ref_count; /* must come first, 32-bit */
-    JSGCObjectTypeEnum gc_obj_type : 4;
-    uint8_t mark : 4; /* used by the GC */
-    uint8_t dummy1; /* not used by the GC */
-    uint16_t dummy2; /* not used by the GC */
-    struct list_head link;
-};
+// /* header for GC objects. GC objects are C data structures with a
+//    reference count that can reference other GC objects. JS Objects are
+//    a particular type of GC object. */
+// struct JSGCObjectHeader {
+//     int ref_count; /* must come first, 32-bit */
+//     JSGCObjectTypeEnum gc_obj_type : 4;
+//     uint8_t mark : 4; /* used by the GC */
+//     uint8_t dummy1; /* not used by the GC */
+//     uint16_t dummy2; /* not used by the GC */
+//     struct list_head link;
+// };
 
-typedef struct JSVarRef {
-    union {
-        JSGCObjectHeader header; /* must come first */
-        struct {
-            int __gc_ref_count; /* corresponds to header.ref_count */
-            uint8_t __gc_mark; /* corresponds to header.mark/gc_obj_type */
-            uint8_t is_detached : 1; 
-            uint8_t is_arg : 1;
-            uint16_t var_idx; /* index of the corresponding function variable on
-                                 the stack */
-        };
-    };
-    JSValue *pvalue; /* pointer to the value, either on the stack or
-                        to 'value' */
-    union {
-        JSValue value; /* used when is_detached = TRUE */
-        struct {
-            struct list_head var_ref_link; /* JSStackFrame.var_ref_list list */
-            struct JSAsyncFunctionState *async_func; /* != NULL if async stack frame */
-        }; /* used when is_detached = FALSE */
-    };
-} JSVarRef;
+// typedef struct JSVarRef {
+//     union {
+//         JSGCObjectHeader header; /* must come first */
+//         struct {
+//             int __gc_ref_count; /* corresponds to header.ref_count */
+//             uint8_t __gc_mark; /* corresponds to header.mark/gc_obj_type */
+//             uint8_t is_detached : 1; 
+//             uint8_t is_arg : 1;
+//             uint16_t var_idx; /* index of the corresponding function variable on
+//                                  the stack */
+//         };
+//     };
+//     JSValue *pvalue; /* pointer to the value, either on the stack or
+//                         to 'value' */
+//     union {
+//         JSValue value; /* used when is_detached = TRUE */
+//         struct {
+//             struct list_head var_ref_link; /* JSStackFrame.var_ref_list list */
+//             struct JSAsyncFunctionState *async_func; /* != NULL if async stack frame */
+//         }; /* used when is_detached = FALSE */
+//     };
+// } JSVarRef;
 
 /* the same structure is used for big integers and big floats. Big
    integers are never infinite or NaNs */
@@ -675,16 +675,16 @@ typedef struct JSTypedArray {
     uint32_t length; /* length in the array buffer */
 } JSTypedArray;
 
-typedef struct JSAsyncFunctionState {
-    JSGCObjectHeader header;
-    JSValue this_val; /* 'this' argument */
-    int argc; /* number of function arguments */
-    BOOL throw_flag; /* used to throw an exception in JS_CallInternal() */
-    BOOL is_completed; /* TRUE if the function has returned. The stack
-                          frame is no longer valid */
-    JSValue resolving_funcs[2]; /* only used in JS async functions */
-    JSStackFrame frame;
-} JSAsyncFunctionState;
+// typedef struct JSAsyncFunctionState {
+//     JSGCObjectHeader header;
+//     JSValue this_val; /* 'this' argument */
+//     int argc; /* number of function arguments */
+//     BOOL throw_flag; /* used to throw an exception in JS_CallInternal() */
+//     BOOL is_completed; /* TRUE if the function has returned. The stack
+//                           frame is no longer valid */
+//     JSValue resolving_funcs[2]; /* only used in JS async functions */
+//     JSStackFrame frame;
+// } JSAsyncFunctionState;
 
 typedef enum {
    /* binary operators */
@@ -738,24 +738,24 @@ typedef struct JSReqModuleEntry {
     JSModuleDef *module; /* used using resolution */
 } JSReqModuleEntry;
 
-typedef enum JSExportTypeEnum {
-    JS_EXPORT_TYPE_LOCAL,
-    JS_EXPORT_TYPE_INDIRECT,
-} JSExportTypeEnum;
+// typedef enum JSExportTypeEnum {
+//     JS_EXPORT_TYPE_LOCAL,
+//     JS_EXPORT_TYPE_INDIRECT,
+// } JSExportTypeEnum;
 
-typedef struct JSExportEntry {
-    union {
-        struct {
-            int var_idx; /* closure variable index */
-            JSVarRef *var_ref; /* if != NULL, reference to the variable */
-        } local; /* for local export */
-        int req_module_idx; /* module for indirect export */
-    } u;
-    JSExportTypeEnum export_type;
-    JSAtom local_name; /* '*' if export ns from. not used for local
-                          export after compilation */
-    JSAtom export_name; /* exported variable name */
-} JSExportEntry;
+// typedef struct JSExportEntry {
+//     union {
+//         struct {
+//             int var_idx; /* closure variable index */
+//             JSVarRef *var_ref; /* if != NULL, reference to the variable */
+//         } local; /* for local export */
+//         int req_module_idx; /* module for indirect export */
+//     } u;
+//     JSExportTypeEnum export_type;
+//     JSAtom local_name; /* '*' if export ns from. not used for local
+//                           export after compilation */
+//     JSAtom export_name; /* exported variable name */
+// } JSExportEntry;
 
 typedef struct JSStarExportEntry {
     int req_module_idx; /* in req_module_entries */
@@ -27221,7 +27221,7 @@ static int add_req_module_entry(JSContext *ctx, JSModuleDef *m,
     return i;
 }
 
-static JSExportEntry *find_export_entry(JSContext *ctx, JSModuleDef *m,
+JSExportEntry *find_export_entry(JSContext *ctx, JSModuleDef *m,
                                         JSAtom export_name)
 {
     JSExportEntry *me;
@@ -27404,7 +27404,8 @@ static char *js_default_module_normalize_name(JSContext *ctx,
     return filename;
 }
 
-static JSModuleDef *js_find_loaded_module(JSContext *ctx, JSAtom name)
+// static 
+JSModuleDef *js_find_loaded_module(JSContext *ctx, JSAtom name)
 {
     struct list_head *el;
     JSModuleDef *m;
@@ -47657,29 +47658,29 @@ static const JSCFunctionListEntry js_generator_proto_funcs[] = {
 
 /* Promise */
 
-typedef struct JSPromiseData {
-    JSPromiseStateEnum promise_state;
-    /* 0=fulfill, 1=reject, list of JSPromiseReactionData.link */
-    struct list_head promise_reactions[2];
-    BOOL is_handled; /* Note: only useful to debug */
-    JSValue promise_result;
-} JSPromiseData;
+// typedef struct JSPromiseData {
+//     JSPromiseStateEnum promise_state;
+//     /* 0=fulfill, 1=reject, list of JSPromiseReactionData.link */
+//     struct list_head promise_reactions[2];
+//     BOOL is_handled; /* Note: only useful to debug */
+//     JSValue promise_result;
+// } JSPromiseData;
 
-typedef struct JSPromiseFunctionDataResolved {
-    int ref_count;
-    BOOL already_resolved;
-} JSPromiseFunctionDataResolved;
+// typedef struct JSPromiseFunctionDataResolved {
+//     int ref_count;
+//     BOOL already_resolved;
+// } JSPromiseFunctionDataResolved;
 
-typedef struct JSPromiseFunctionData {
-    JSValue promise;
-    JSPromiseFunctionDataResolved *presolved;
-} JSPromiseFunctionData;
+// typedef struct JSPromiseFunctionData {
+//     JSValue promise;
+//     JSPromiseFunctionDataResolved *presolved;
+// } JSPromiseFunctionData;
 
-typedef struct JSPromiseReactionData {
-    struct list_head link; /* not used in promise_reaction_job */
-    JSValue resolving_funcs[2];
-    JSValue handler;
-} JSPromiseReactionData;
+// typedef struct JSPromiseReactionData {
+//     struct list_head link; /* not used in promise_reaction_job */
+//     JSValue resolving_funcs[2];
+//     JSValue handler;
+// } JSPromiseReactionData;
 
 JSPromiseStateEnum JS_PromiseState(JSContext *ctx, JSValue promise)
 {

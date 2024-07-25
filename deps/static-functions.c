@@ -114,3 +114,11 @@ JSValue JS_NewCFunction_real(JSContext *ctx, JSCFunction *func, const char *name
 JSValue JS_NewCFunctionMagic_real(JSContext *ctx, JSCFunctionMagic *func, const char *name, int length, JSCFunctionEnum cproto, int magic) {
     return JS_NewCFunctionMagic(ctx, func, name, length, cproto, magic);
 }
+
+JSExportEntry *Find_Export_Entry_real(JSContext *ctx, JSModuleDef *m, JSAtom export_name) {
+    return find_export_entry(ctx, m, export_name);
+}
+
+JSModuleDef *JS_Find_Loaded_Module_real(JSContext *ctx, JSAtom name) {
+    return js_find_loaded_module(ctx, name);
+}
