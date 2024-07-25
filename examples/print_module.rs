@@ -5,7 +5,7 @@ use ez_quick_js::function::C_FUNC_DEF;
 use ez_quick_js::JS_UNDEFINED;
 use ez_quick_js::ffi::{JS_EVAL_TYPE_GLOBAL, JS_EVAL_TYPE_MODULE};
 use ez_quick_js::{
-    ffi::{js_to_string, JSCFunctionListEntry, JSContext, JSModuleDef, JSValue},
+    ffi::{JS_ToStr, JSCFunctionListEntry, JSContext, JSModuleDef, JSValue},
     function::{add_module_export_list, set_module_export_list},
     Context, JsModuleDef, Runtime,
 };
@@ -80,7 +80,7 @@ unsafe extern "C" fn js_print(
             print!(" ");
         }
 
-        let str = js_to_string(ctx, *item);
+        let str = JS_ToStr(ctx, *item);
         print!("{str}");
     }
 

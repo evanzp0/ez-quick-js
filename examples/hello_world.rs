@@ -1,7 +1,7 @@
 use std::fs;
 
 use ez_quick_js::{
-    ffi::{js_to_string, JSContext, JSValue, JS_EVAL_TYPE_GLOBAL},
+    ffi::{JS_ToStr, JSContext, JSValue, JS_EVAL_TYPE_GLOBAL},
     Context, Runtime, JS_UNDEFINED,
 };
 
@@ -52,7 +52,7 @@ unsafe extern "C" fn js_print(
             print!(" ");
         }
 
-        let str = js_to_string(ctx, *item);
+        let str = JS_ToStr(ctx, *item);
         print!("{str}");
     }
 

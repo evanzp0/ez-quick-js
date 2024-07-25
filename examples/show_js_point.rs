@@ -1,7 +1,7 @@
 use std::fs;
 
 use ez_quick_js::{
-    ffi::{js_to_string, JSContext, JSValue, JS_EVAL_TYPE_GLOBAL, JS_PROP_C_W_E},
+    ffi::{JSContext, JSValue, JS_GetPropertyStr, JS_NewInt32, JS_ToI32, JS_ToStr, JS_EVAL_TYPE_GLOBAL, JS_PROP_C_W_E},
     function::call_function,
     Context, JsValue, Runtime, JS_UNDEFINED,
 };
@@ -21,7 +21,7 @@ fn main() {
     let js_show_point_fn = global_obj.get_property("show_point").unwrap();
     let js_point_obj = create_js_point(ctx, 2, 3);
     let rst = call_function(ctx, &js_show_point_fn, None, &vec![&js_point_obj]).unwrap();
-    let point = get_point_from_js(&rst);
+    let point = get_point_from_js(ctx.inner, *rst.raw_value());
     println!("return : {:?}", point);
 }
 
@@ -43,19 +43,18 @@ fn create_js_point<'a>(ctx: &'a Context, pt_x: i32, pt_y: i32) -> JsValue<'a> {
     js_point_obj
 }
 
-fn get_point_from_js(this_obj: &JsValue) -> Point {
-    let x = this_obj
-        .get_property("x")
-        .unwrap()
-        .to_int()
-        .unwrap()
-        .value();
-    let y = this_obj
-        .get_property("y")
-        .unwrap()
-        .to_int()
-        .unwrap()
-        .value();
+fn get_point_from_js(ctx: *mut JSContext, this_obj: JSValue) -> Point {
+    let p_name_x = "x\0";
+    let p_name_y = "y\0";
+
+    let x = unsafe {
+        let val = JS_GetPropertyStr(ctx, this_obj, p_name_x.as_ptr() as _);
+        JS_ToI32(ctx, val)
+    };
+    let y = unsafe { 
+        let val = JS_GetPropertyStr(ctx, this_obj, p_name_y.as_ptr() as _);
+        JS_ToI32(ctx, val)
+    };
 
     Point { x, y }
 }
@@ -79,17 +78,12 @@ unsafe extern "C" fn point_multiple(
     _argc: ::std::os::raw::c_int,
     _argv: *mut JSValue,
 ) -> JSValue {
-    let ctx = Context::from_raw(ctx);
     let val = {
-        let this_obj = JsValue::new(&ctx, this_val);
-        let point = get_point_from_js(&this_obj);
-
-        let val = ctx.get_int(point.x * point.y);
-        this_obj.forget(); // 当前 object 不能被 drop
-        val.forget() // val 要返回，也不能被 drop
+        let point = get_point_from_js(ctx, this_val);
+        let val = point.x * point.y;
+        JS_NewInt32(ctx, val)
     };
-
-    ctx.forget(); // ctx 由外部回收，不能被 drop
+    
     val
 }
 
@@ -106,7 +100,7 @@ unsafe extern "C" fn js_print(
             print!(" ");
         }
 
-        let str = js_to_string(ctx, *item);
+        let str = JS_ToStr(ctx, *item);
         print!("{str}");
     }
 

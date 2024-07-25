@@ -8,7 +8,15 @@ use std::{
 use crate::{
     common::{make_cstring, Error},
     ffi::{
-        js_free, js_new_object_with_proto, JSAtom, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor, JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionListEntry, JSCFunctionMagic, JSCFunctionType, JSClassDef, JSClassID, JSContext, JSModuleDef, JSModuleInitFunc, JSValue, JSValueUnion, JS_AddModuleExport, JS_Call, JS_DefinePropertyValue, JS_EvalFunction, JS_GetException, JS_NewAtomLen, JS_NewCFunction2, JS_NewCModule, JS_NewClass, JS_NewClassID, JS_NewObjectProtoClass, JS_ReadObject, JS_SetClassProto, JS_SetConstructor, JS_SetModuleExportList, JS_SetPropertyFunctionList, JS_WriteObject, JS_DEF_CFUNC, JS_DEF_CGETSET, JS_PROP_CONFIGURABLE, JS_PROP_WRITABLE, JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE
+        js_free, JSAtom, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor,
+        JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionListEntry, JSCFunctionMagic, JSCFunctionType,
+        JSClassDef, JSClassID, JSContext, JSModuleDef, JSModuleInitFunc, JSValue, JSValueUnion,
+        JS_AddModuleExport, JS_Call, JS_DefinePropertyValue, JS_EvalFunction, JS_GetException,
+        JS_NewAtomLen, JS_NewCFunction2, JS_NewCModule, JS_NewClass, JS_NewClassID,
+        JS_NewObjectProtoClass, JS_NewObjectWithProto, JS_ReadObject, JS_SetClassProto,
+        JS_SetConstructor, JS_SetModuleExportList, JS_SetPropertyFunctionList, JS_WriteObject,
+        JS_DEF_CFUNC, JS_DEF_CGETSET, JS_PROP_CONFIGURABLE, JS_PROP_WRITABLE, JS_READ_OBJ_BYTECODE,
+        JS_WRITE_OBJ_BYTECODE,
     },
     Context, JSCGetter, JSCSetter, JsAtom, JsCompiledFunction, JsFunction, JsModuleDef, JsValue,
     JS_UNDEFINED,
@@ -197,7 +205,7 @@ pub fn new_object_with_proto<'a>(
     proto: Option<JsValue>,
 ) -> Result<JsValue<'a>, Error> {
     let proto = proto.map(|val| val.inner);
-    let val = unsafe { js_new_object_with_proto(ctx.inner, proto) };
+    let val = unsafe { JS_NewObjectWithProto(ctx.inner, proto) };
 
     let val = JsValue::new(ctx, val);
     assert_exception(
@@ -357,7 +365,7 @@ pub fn add_module_export_list(
     for item in tab {
         add_module_export(ctx, module, item.name)?;
     }
-    
+
     // unsafe {
     //     crate::ffi::JS_AddModuleExportList(
     //         ctx.inner,
@@ -448,13 +456,7 @@ pub fn new_class_id(class_id: &mut JSClassID) -> JSClassID {
 
 // class_id 是从 1 开始生成的
 pub fn new_class(ctx: &Context, class_id: JSClassID, class_def: &JSClassDef) -> Result<(), Error> {
-    let rst = unsafe {
-        JS_NewClass(
-            ctx.get_runtime().inner,
-            class_id,
-            class_def as _,
-        )
-    };
+    let rst = unsafe { JS_NewClass(ctx.get_runtime().inner, class_id, class_def as _) };
 
     if rst == -1 {
         if let Some(err) = get_last_exception(ctx) {
@@ -496,7 +498,7 @@ pub fn new_object_proto_class<'a>(
     ctx: &'a Context,
     proto: &JsValue,
     class_id: JSClassID,
-) -> Result<JsValue<'a>, Error >{
+) -> Result<JsValue<'a>, Error> {
     let val = unsafe { JS_NewObjectProtoClass(ctx.inner, proto.inner, class_id) };
     let val = JsValue::new(ctx, val);
 

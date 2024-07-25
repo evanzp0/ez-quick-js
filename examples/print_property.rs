@@ -97,7 +97,7 @@ unsafe extern "C" fn js_print(
         if idx != 0 {
             print!(" ");
         }
-        let str = ez_quick_js::ffi::js_to_string(_ctx, *item);
+        let str = ez_quick_js::ffi::JS_ToStr(_ctx, *item);
         print!(" {str} ");
     }
 

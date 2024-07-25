@@ -3,8 +3,8 @@ use std::ffi::c_void;
 use crate::{
     common::{make_cstring, Error},
     ffi::{
-        js_dup_value, js_free_value, js_new_float64, js_new_int32, js_new_string, js_to_f64,
-        js_to_i32, JSContext, JSRefCountHeader, JSValue, JSValueUnion, JS_ATOM_NULL,
+        JS_DupValue, JS_FreeValue, JS_NewFloat64, JS_NewInt32, JS_NewString, JS_ToF64,
+        JS_ToI32, JSContext, JSRefCountHeader, JSValue, JSValueUnion, JS_ATOM_NULL,
         JS_TAG_EXCEPTION, JS_TAG_NULL, JS_TAG_UNDEFINED,
     },
     function::{get_last_exception, run_compiled_function, to_bytecode},
@@ -28,7 +28,7 @@ macro_rules! struct_type {
     ($type:ident) => {
         pub struct $type<'a> {
             pub(crate) ctx: &'a crate::Context,
-            pub inner: JSValue,
+            pub(crate) inner: JSValue,
         }
     };
 }
@@ -76,7 +76,7 @@ macro_rules! impl_drop {
         impl<'a> Drop for $type<'a> {
             fn drop(&mut self) {
                 unsafe {
-                    crate::ffi::js_free_value(self.ctx.inner, self.inner);
+                    crate::ffi::JS_FreeValue(self.ctx.inner, self.inner);
                 }
             }
         }
@@ -87,7 +87,7 @@ macro_rules! impl_clone {
     { $type:ident } => {
         impl<'a> Clone for $type<'a> {
             fn clone(&self) -> Self {
-                unsafe { crate::ffi::js_dup_value(self.ctx.inner, self.inner) };
+                unsafe { crate::ffi::JS_DupValue(self.ctx.inner, self.inner) };
                 Self {
                     ctx: self.ctx,
                     inner: self.inner,
@@ -223,7 +223,7 @@ macro_rules! impl_partial_eq {
             fn eq(&self, other: &$rhs) -> bool {
                 let a = self.raw_value();
                 let b = other.raw_value();
-                unsafe { crate::ffi::js_equal(self.context().inner, a, b) }
+                unsafe { crate::ffi::JS_Equal(self.context().inner, a, b) }
             }
         }
     };
@@ -266,7 +266,7 @@ pub enum JsTag {
 impl JsTag {
     #[inline]
     pub fn from_c(value: &JSValue) -> JsTag {
-        let inner = unsafe { crate::ffi::js_value_get_tag(*value) };
+        let inner = unsafe { crate::ffi::JS_ValueGetTag(*value) };
         match inner {
             crate::ffi::JS_TAG_INT => JsTag::Int,
             crate::ffi::JS_TAG_BOOL => JsTag::Bool,
@@ -473,8 +473,8 @@ impl<'a> Clone for JsAtom<'a> {
 //////////////////////////////////////////////////////////////
 
 struct_type!(JsInteger);
-impl_type_debug!(JsInteger, is_int, crate::ffi::js_to_i32);
-impl_type_common_fn!(JsInteger, i32, crate::ffi::js_new_int32);
+impl_type_debug!(JsInteger, is_int, crate::ffi::JS_ToI32);
+impl_type_common_fn!(JsInteger, i32, crate::ffi::JS_NewInt32);
 impl_drop!(JsInteger);
 impl_clone!(JsInteger);
 impl_try_from!(JsValue for JsInteger if v => v.is_int());
@@ -485,8 +485,8 @@ impl<'a> From<JsNumber<'a>> for JsInteger<'a> {
             inner: inner_val,
         } = value;
         let inner = {
-            let v = js_to_i32(ctx.inner, inner_val);
-            unsafe { js_new_int32(ctx.inner, v) }
+            let v = JS_ToI32(ctx.inner, inner_val);
+            unsafe { JS_NewInt32(ctx.inner, v) }
         };
 
         Self { ctx, inner }
@@ -494,38 +494,38 @@ impl<'a> From<JsNumber<'a>> for JsInteger<'a> {
 }
 impl_eq!(for JsInteger);
 impl_partial_eq!(JsInteger for JsInteger);
-impl_value_fn!(JsInteger, js_to_i32, i32);
+impl_value_fn!(JsInteger, JS_ToI32, i32);
 
 struct_type!(JsNumber);
-impl_type_common_fn!(JsNumber, f64, crate::ffi::js_new_float64);
-impl_type_debug!(JsNumber, is_number, crate::ffi::js_to_f64);
+impl_type_common_fn!(JsNumber, f64, crate::ffi::JS_NewFloat64);
+impl_type_debug!(JsNumber, is_number, crate::ffi::JS_ToF64);
 impl_drop!(JsNumber);
 impl_clone!(JsNumber);
 impl_from!(JsInteger for JsNumber);
 impl_try_from!(JsValue for JsNumber if v => v.is_number());
 impl_eq!(for JsNumber);
 impl_partial_eq!(JsNumber for JsNumber);
-impl_value_fn!(JsNumber, js_to_f64, f64);
+impl_value_fn!(JsNumber, JS_ToF64, f64);
 
 struct_type!(JsBoolean);
-impl_type_common_fn!(JsBoolean, bool, crate::ffi::js_new_bool);
-impl_type_debug!(JsBoolean, is_bool, crate::ffi::js_to_bool);
+impl_type_common_fn!(JsBoolean, bool, crate::ffi::JS_NewBool);
+impl_type_debug!(JsBoolean, is_bool, crate::ffi::JS_ToBoolean);
 impl_drop!(JsBoolean);
 impl_clone!(JsBoolean);
 impl_try_from!(JsValue for JsBoolean if v => v.is_bool());
 impl_eq!(for JsBoolean);
 impl_partial_eq!(JsBoolean for JsBoolean);
-impl_value_fn!(JsBoolean, js_to_bool, bool);
+impl_value_fn!(JsBoolean, JS_ToBoolean, bool);
 
 struct_type!(JsString);
-impl_type_common_fn!(JsString, &str, crate::ffi::js_new_string);
-impl_type_debug!(JsString, is_string, crate::ffi::js_to_string);
+impl_type_common_fn!(JsString, &str, crate::ffi::JS_NewStr);
+impl_type_debug!(JsString, is_string, crate::ffi::JS_ToStr);
 impl_drop!(JsString);
 impl_clone!(JsString);
 impl_try_from!(JsValue for JsString if v => v.is_string());
 impl_eq!(for JsString);
 impl_partial_eq!(JsString for JsString);
-impl_value_fn!(JsString, js_to_string, std::borrow::Cow<'_, str>);
+impl_value_fn!(JsString, JS_ToStr, std::borrow::Cow<'_, str>);
 
 struct_type!(JsValue);
 impl<'a> JsValue<'a> {
@@ -553,13 +553,13 @@ impl<'a> JsValue<'a> {
 
     pub(crate) fn increment_ref_count(&self) {
         if self.inner.tag < 0 {
-            unsafe { js_dup_value(self.ctx.inner, self.inner) }
+            unsafe { JS_DupValue(self.ctx.inner, self.inner) }
         }
     }
 
     pub(crate) fn decrement_ref_count(&self) {
         if self.inner.tag < 0 {
-            unsafe { js_free_value(self.ctx.inner, self.inner) }
+            unsafe { JS_FreeValue(self.ctx.inner, self.inner) }
         }
     }
 
@@ -714,7 +714,7 @@ struct_type!(JsObject);
 impl_type_common_fn!(
     JsObject,
     Option<JSValue>,
-    crate::ffi::js_new_object_with_proto
+    crate::ffi::JS_NewObjectWithProto
 );
 impl<'a> std::fmt::Debug for JsObject<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -935,7 +935,7 @@ mod tests {
         assert_ne!(val_1, val_2);
 
         let js_val = unsafe { val_1.forget() };
-        unsafe { crate::ffi::js_free_value(ctx.inner, js_val) };
+        unsafe { crate::ffi::JS_FreeValue(ctx.inner, js_val) };
 
         let js_prop = JsObject::new(ctx, None);
         let prop_val = JsInteger::new(ctx, 2);

@@ -1,6 +1,6 @@
 use crate::{
     common::Error, ffi::{
-        js_new_object_with_proto, JSCFunction, JSContext, JSModuleInitFunc, JS_FreeContext, JS_FreeRuntime, JS_GetRuntime, JS_NewContext, 
+        JS_NewObjectWithProto, JSCFunction, JSContext, JSModuleInitFunc, JS_FreeContext, JS_FreeRuntime, JS_GetRuntime, JS_NewContext, 
     }, function::{
         get_global_object, js_eval, new_atom, new_c_function, new_c_module, new_object_with_proto,
     }, CFunctionInner, JsAtom, JsBoolean, JsInteger, JsModuleDef, JsNumber, JsString, JsValue, Runtime, JS_NULL, JS_UNDEFINED
@@ -29,17 +29,17 @@ impl Context {
         new_c_module(self, module_name, module_init_func)
     }
 
-    pub fn from_raw(js_ctx: *mut JSContext) -> Self {
-        let runtime = {
-            let rt = unsafe { JS_GetRuntime(js_ctx) };
-            Runtime::from_raw(rt)
-        };
+    // pub fn from_raw(js_ctx: *mut JSContext) -> Self {
+    //     let runtime = {
+    //         let rt = unsafe { JS_GetRuntime(js_ctx) };
+    //         Runtime::from_raw(rt)
+    //     };
 
-        Self {
-            runtime,
-            inner: js_ctx,
-        }
-    }
+    //     Self {
+    //         runtime,
+    //         inner: js_ctx,
+    //     }
+    // }
 
     pub unsafe fn forget(self) -> *mut JSContext {
         let v = self.inner;

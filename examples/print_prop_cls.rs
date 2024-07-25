@@ -5,7 +5,7 @@ use std::ptr::null_mut;
 
 use anyhow::Error;
 use ez_quick_js::ffi::{
-    js_free_value, js_is_exception, js_new_int32, js_to_string, JSClassDef, JSClassID, JSRuntime,
+    JS_FreeValue, JS_IsException, JS_NewInt32, JS_ToStr, JSClassDef, JSClassID, JSRuntime,
     JS_GetOpaque, JS_GetOpaque2, JS_GetPropertyStr, JS_NewObjectProtoClass, JS_SetOpaque,
     JS_ToInt32, JS_EVAL_TYPE_GLOBAL, JS_TAG_INT,
 };
@@ -111,7 +111,7 @@ unsafe extern "C" fn js_printclass_constructor(
     let js_print_obj = {
         // 从 js ctor 上获取 prototype
         let proto = JS_GetPropertyStr(ctx, new_target, b"prototype\0".as_ptr() as _);
-        if js_is_exception(proto) {
+        if JS_IsException(proto) {
             return JS_EXCEPTION;
         }
 
@@ -121,7 +121,7 @@ unsafe extern "C" fn js_printclass_constructor(
             proto, /* 也可以设为 JS_NULL */
             *PRINT_CLASS_ID,
         );
-        js_free_value(ctx, proto);
+        JS_FreeValue(ctx, proto);
 
         obj
     };
@@ -172,7 +172,7 @@ unsafe extern "C" fn js_print_val_getter(ctx: *mut JSContext, this_val: JSValue)
 
     // 获取 print.val 并转成 JSValue 类型
     let val = native_print_val_getter(native_print.as_ref().unwrap());
-    let js_val = js_new_int32(ctx, val);
+    let js_val = JS_NewInt32(ctx, val);
 
     println!("Print val getter is called");
 
@@ -304,7 +304,7 @@ unsafe extern "C" fn js_print(
             print!(" ");
         }
 
-        let str = js_to_string(ctx, *item);
+        let str = JS_ToStr(ctx, *item);
         print!("{str}");
     }
 
