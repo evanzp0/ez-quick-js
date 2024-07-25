@@ -5,11 +5,7 @@ use std::ptr::null_mut;
 
 use anyhow::Error;
 use ez_quick_js::ffi::{
-    JSCFunctionEnum_JS_CFUNC_constructor, JSClassDef, JSClassID, JSModuleDef, JSRuntime,
-    JS_FreeValue, JS_GetOpaque, JS_GetOpaque2, JS_GetPropertyStr, JS_GetRuntime, JS_IsException,
-    JS_NewCFunction2, JS_NewClass, JS_NewInt32, JS_NewObject, JS_NewObjectProtoClass,
-    JS_SetClassProto, JS_SetConstructor, JS_SetModuleExport, JS_SetOpaque,
-    JS_SetPropertyFunctionList, JS_ToInt32, JS_EVAL_TYPE_GLOBAL, JS_EVAL_TYPE_MODULE, JS_TAG_INT,
+    JSCFunctionEnum_JS_CFUNC_constructor, JSClassDef, JSClassID, JSModuleDef, JSRuntime, JS_AtomToString, JS_FreeValue, JS_GetModuleName, JS_GetOpaque, JS_GetOpaque2, JS_GetPropertyStr, JS_GetRuntime, JS_IsException, JS_NewCFunction2, JS_NewClass, JS_NewInt32, JS_NewObject, JS_NewObjectProtoClass, JS_SetClassProto, JS_SetConstructor, JS_SetModuleExport, JS_SetOpaque, JS_SetPropertyFunctionList, JS_ToInt32, JS_ToStr, JS_EVAL_TYPE_GLOBAL, JS_EVAL_TYPE_MODULE, JS_TAG_INT, JS_VALUE_GET_PTR
 };
 use ez_quick_js::function::{add_module_export, new_class_id, C_FUNC_DEF, C_GET_SET_DEF};
 use ez_quick_js::{
@@ -284,7 +280,18 @@ fn test_module() -> Result<(), Error> {
     let rt = Runtime::new(None);
     let ctx = &rt.create_context();
 
-    init_module(ctx, "_G")?;
+    let md = init_module(ctx, "_G")?;
+    {
+        let md_name_atom = unsafe {JS_GetModuleName(ctx.inner, md.raw_value() as _)};
+        println!("{}", md_name_atom);
+    
+        let m_str = unsafe {
+            let val = JS_AtomToString(ctx.inner, md_name_atom);
+            JS_ToStr(ctx.inner, val)
+        }; 
+        println!("{}", m_str);
+    }
+
     let rst = ctx.eval(
         code,
         file_name,
@@ -293,9 +300,8 @@ fn test_module() -> Result<(), Error> {
 
     assert!(rst.is_object());
 
-    // let ptr = unsafe { JS_VALUE_GET_PTR(*rst.raw_value()) };
-    // let m = ptr as *mut JSModuleDef;
-    // assert_eq!(rst.raw_value().tag, -3);
+    let m = unsafe { JS_VALUE_GET_PTR(*rst.raw_value()) };
+    println!("{:p}", m);
 
     Ok(())
 }
