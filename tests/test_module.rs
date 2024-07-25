@@ -323,7 +323,13 @@ fn test_module() -> Result<(), Error> {
     };
     unsafe {
         println!("ff_module = {:p}", ff_module);
-        println!("ret_val.export_name = {}", (*ret_val).export_name);
+        let export_name = {
+            let val = JS_AtomToString(ctx.inner, (*ret_val).export_name);
+            let v = JS_ToStr(ctx.inner, val);
+            JS_FreeValue(ctx.inner, val);
+            v
+        };
+        println!("ret_val.export_name = {}", export_name);
         println!(
             "ret_val.pvalue = {:p}",
             (*(*ret_val).u.local.var_ref).pvalue
@@ -338,6 +344,24 @@ fn test_module() -> Result<(), Error> {
         println!("ret_val in module: {}", ret_val);
         assert_eq!(40, ret_val);
     }
+
+    let default = unsafe {
+        let ret_atom = JS_NewAtomLen(ctx.inner, b"default\0".as_ptr() as _, 7);
+        Find_Export_Entry(ctx.inner, ff_module, ret_atom as _)
+    };
+    unsafe {
+        let export_name = {
+            let val = JS_AtomToString(ctx.inner, (*default).export_name);
+            JS_ToStr(ctx.inner, val)
+        };
+        println!("export_name = {}", export_name);
+
+        let default_val = JsValue::new(ctx, *(*(*default).u.local.var_ref).pvalue);
+        let tmp = default_val.to_string().unwrap();
+        let default_str = tmp.value();
+        println!("default_str = {}", default_str);
+    }
+    
 
     Ok(())
 }

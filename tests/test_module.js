@@ -5,4 +5,6 @@ g.val = 4;
 
 let ret_val = 40;
 
+export default "evan";
+
 export { ret_val };
