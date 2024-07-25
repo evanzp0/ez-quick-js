@@ -300,7 +300,7 @@ fn test_module() -> Result<(), Error> {
 
     let rst_promise = ctx.eval(
         code,
-        "ff",
+        "ff_module",
         (JS_EVAL_TYPE_GLOBAL | JS_EVAL_TYPE_MODULE) as i32,
     )?;
     assert!(rst_promise.is_object());
@@ -313,55 +313,53 @@ fn test_module() -> Result<(), Error> {
         println!("promise_result = {:p}", s.u.ptr);
     }
 
-    let ff_module = unsafe {
-        let ff_atom = JS_NewAtomLen(ctx.inner, b"ff\0".as_ptr() as _, 2);
-        JS_Find_Loaded_Module(ctx.inner, ff_atom)
-    };
-    let ret_val = unsafe {
-        let ret_atom = JS_NewAtomLen(ctx.inner, b"ret_val\0".as_ptr() as _, 7);
-        Find_Export_Entry(ctx.inner, ff_module, ret_atom as _)
-    };
+    // assert -----------------
+
     unsafe {
-        println!("ff_module = {:p}", ff_module);
+        let ff_module = {
+            let ff_atom = JS_NewAtomLen(ctx.inner, b"ff_module\0".as_ptr() as _, 9);
+            JS_Find_Loaded_Module(ctx.inner, ff_atom)
+        };
+
+        assert!(ff_module != null_mut());
+        
+        let ret_val_entry = {
+            let ret_atom = JS_NewAtomLen(ctx.inner, b"ret_val\0".as_ptr() as _, 7);
+            Find_Export_Entry(ctx.inner, ff_module, ret_atom as _)
+        };
+
         let export_name = {
-            let val = JS_AtomToString(ctx.inner, (*ret_val).export_name);
+            let val = JS_AtomToString(ctx.inner, (*ret_val_entry).export_name);
             let v = JS_ToStr(ctx.inner, val);
             JS_FreeValue(ctx.inner, val);
             v
         };
-        println!("ret_val.export_name = {}", export_name);
-        println!(
-            "ret_val.pvalue = {:p}",
-            (*(*ret_val).u.local.var_ref).pvalue
-        );
-        println!(
-            "ret_val.ret_val.tag = {}",
-            (*(*(*ret_val).u.local.var_ref).pvalue).tag
-        );
-        let ret_val = JsValue::new(ctx, *(*(*ret_val).u.local.var_ref).pvalue);
+        assert_eq!("ret_val", export_name);
+
+        let ret_val = JsValue::new(ctx, *(*(*ret_val_entry).u.local.var_ref).pvalue);
         let ret_val = ret_val.to_int().unwrap().value();
-
-        println!("ret_val in module: {}", ret_val);
         assert_eq!(40, ret_val);
-    }
 
-    let default = unsafe {
-        let ret_atom = JS_NewAtomLen(ctx.inner, b"default\0".as_ptr() as _, 7);
-        Find_Export_Entry(ctx.inner, ff_module, ret_atom as _)
-    };
-    unsafe {
-        let export_name = {
-            let val = JS_AtomToString(ctx.inner, (*default).export_name);
-            JS_ToStr(ctx.inner, val)
+        let default_entry = {
+            let ret_atom = JS_NewAtomLen(ctx.inner, b"default\0".as_ptr() as _, 7);
+            Find_Export_Entry(ctx.inner, ff_module, ret_atom as _)
         };
-        println!("export_name = {}", export_name);
 
-        let default_val = JsValue::new(ctx, *(*(*default).u.local.var_ref).pvalue);
-        let tmp = default_val.to_string().unwrap();
-        let default_str = tmp.value();
-        println!("default_str = {}", default_str);
-    }
+        {
+            let export_name = {
+                let val = JS_AtomToString(ctx.inner, (*default_entry).export_name);
+                JS_ToStr(ctx.inner, val)
+            };
+            assert_eq!("default", export_name);
     
+            let default_val = JsValue::new(ctx, *(*(*default_entry).u.local.var_ref).pvalue);
+            let tmp = default_val.to_string().unwrap();
+            let default_str = tmp.value();
+            assert_eq!("evan", default_str);
+        }
+    }
+
+
 
     Ok(())
 }
