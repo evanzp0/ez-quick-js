@@ -1,14 +1,18 @@
-use std::{borrow::Cow, ffi::c_void};
+use std::{borrow::Cow, ffi::c_void, ptr::null_mut};
 
 use crate::{
     common::{make_cstring, Error},
     ffi::{
-        JSContext, JSRefCountHeader, JSValue, JSValueUnion, JS_AtomToString, JS_DupValue, JS_FreeValue, JS_NewFloat64, JS_NewInt32, JS_NewString, JS_ToF64, JS_ToI32, JS_ToStr, JS_ATOM_NULL, JS_MKVAL, JS_TAG_EXCEPTION, JS_TAG_NULL, JS_TAG_UNDEFINED
+        Find_Export_Entry, JSContext, JSExportEntry, JSRefCountHeader, JSValue, JSValueUnion,
+        JS_AtomToString, JS_DupValue, JS_FreeValue, JS_NewAtomLen, JS_NewFloat64, JS_NewInt32,
+        JS_NewString, JS_ToF64, JS_ToI32, JS_ToStr, JS_ATOM_NULL, JS_MKVAL, JS_TAG_EXCEPTION,
+        JS_TAG_NULL, JS_TAG_UNDEFINED,
     },
     function::{get_last_exception, run_compiled_function, to_bytecode},
+    Context,
 };
 
-pub type JSCGetter = 
+pub type JSCGetter =
     Option<unsafe extern "C" fn(ctx: *mut JSContext, this_val: JSValue) -> JSValue>;
 pub type JSCSetter =
     Option<unsafe extern "C" fn(ctx: *mut JSContext, this_val: JSValue, val: JSValue) -> JSValue>;
@@ -407,19 +411,43 @@ impl JsTag {
 }
 
 #[derive(Copy, Clone)]
-pub struct JsModuleDef {
+pub struct JsModuleDef<'a> {
+    pub(crate) ctx: &'a Context<'a>,
     pub(crate) inner: *mut crate::ffi::JSModuleDef,
 }
 
-impl JsModuleDef {
-    pub fn new(inner: *mut crate::ffi::JSModuleDef) -> Self {
-        Self { inner }
+impl<'a> JsModuleDef<'a> {
+    pub fn new(ctx: &'a Context, inner: *mut crate::ffi::JSModuleDef) -> Self {
+        Self { ctx, inner }
     }
 
     pub fn raw_value(&self) -> *mut crate::ffi::JSModuleDef {
         self.inner
     }
 
+    pub fn find_export_entry(
+        &'a self,
+        entry_name: &str,
+    ) -> Option<JsExportEntry<'a>> {
+        unsafe {
+            let entry_atom = {
+                let entry_name = make_cstring(entry_name).expect("make_cstring failed");
+                JS_NewAtomLen(
+                    self.ctx.inner,
+                    entry_name.as_ptr(),
+                    entry_name.count_bytes(),
+                )
+            };
+
+            let entry = Find_Export_Entry(self.ctx.inner, self.raw_value(), entry_atom);
+
+            if entry == null_mut() {
+                return None
+            }
+
+            Some(JsExportEntry::new(&self, &*entry))
+        }
+    }
 }
 
 pub struct JsAtom<'a> {
@@ -437,7 +465,6 @@ impl<'a> JsAtom<'a> {
         self.inner == JS_ATOM_NULL
     }
 
-    
     pub fn to_str(&self) -> Cow<'a, str> {
         let val = unsafe { JS_AtomToString(self.ctx.inner, self.inner) };
         JS_ToStr(self.ctx.inner, val)
@@ -840,37 +867,29 @@ impl_try_from!(JsValue for JsCompiledFunction if v => v.is_compiled_function());
 impl_drop!(JsCompiledFunction);
 impl_clone!(JsCompiledFunction);
 
-// struct_type!(JsModule);
-// impl<'a> JsModule<'a> {
-//     to_value_fn!();
-// }
-// impl_try_from!(JsValue for JsModule if v => v.is_module());
-// impl_drop!(JsModule);
-// impl_clone!(JsModule);
+pub struct JsExportEntry<'a> {
+    pub(crate) module: &'a JsModuleDef<'a>,
+    pub(crate) inner: &'a JSExportEntry,
+}
 
-// pub type NativeFunction<'a> = fn(
-//     ctx: &'a crate::Context,
-//     this_val: JsValue,
-//     // argc: i32,
-//     argv: &'a [JsValue],
-// ) -> JsValue<'a>;
+impl<'a> JsExportEntry<'a> {
+    pub fn new(module: &'a JsModuleDef<'a>, inner: &'a JSExportEntry) -> Self {
+        Self { module, inner }
+    }
 
-// pub type NativeFunctionMagic<'a> = fn(
-//     ctx: &'a crate::Context,
-//     this_val: JsValue,
-//     // argc: i32,
-//     argv: &'a [JsValue],
-//     magic: i32,
-// ) -> JsValue<'a>;
+    pub fn module(&self) -> &JsModuleDef {
+        self.module
+    }
 
-// pub type NativeFunctionData<'a> = fn(
-//     ctx: &'a crate::Context,
-//     this_val: JsValue,
-//     // argc: i32,
-//     argv: &'a [JsValue],
-//     magic: i32,
-//     func_data: &'a [JsValue],
-// ) -> JsValue<'a>;
+    pub fn raw_value(&self) -> &JSExportEntry {
+        &self.inner
+    }
+
+    pub fn export_value(&self) -> JsValue<'a> {
+        let value = unsafe { *(*self.inner.u.local.var_ref).pvalue };
+        JsValue::new(self.module.ctx, value)
+    }
+}
 
 #[cfg(test)]
 mod tests {

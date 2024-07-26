@@ -1,11 +1,12 @@
 use crate::{
     common::Error,
     ffi::{
-        JSCFunction, JSContext, JSModuleInitFunc, JS_FreeContext, JS_FreeRuntime, JS_GetRuntime,
-        JS_NewContext, JS_NewObjectWithProto,
+        JSCFunction, JSContext, JSModuleInitFunc, JS_Find_Loaded_Module, JS_FreeContext,
+        JS_FreeRuntime, JS_GetRuntime, JS_NewAtomLen, JS_NewContext, JS_NewObjectWithProto,
     },
     function::{
         get_global_object, js_eval, new_atom, new_c_function, new_c_module, new_object_with_proto,
+        new_raw_atom,
     },
     CFunctionInner, JsAtom, JsBoolean, JsInteger, JsModuleDef, JsNumber, JsString, JsValue,
     Runtime, JS_NULL, JS_UNDEFINED,
@@ -108,6 +109,12 @@ impl<'a> Context<'a> {
         arg_count: i32,
     ) -> Result<JsValue, Error> {
         new_c_function(self, Some(c_func), name, arg_count)
+    }
+
+    pub fn find_loaded_module(&self, module_name: &str) -> JsModuleDef {
+        let atom = new_raw_atom(self, module_name);
+        let m = unsafe { JS_Find_Loaded_Module(self.inner, atom) };
+        JsModuleDef::new(self, m)
     }
 }
 

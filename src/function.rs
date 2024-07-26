@@ -11,15 +11,15 @@ use crate::{
         js_free, JSAtom, JSCFunction, JSCFunctionEnum_JS_CFUNC_constructor,
         JSCFunctionEnum_JS_CFUNC_generic, JSCFunctionListEntry, JSCFunctionMagic, JSCFunctionType,
         JSClassDef, JSClassID, JSContext, JSModuleDef, JSModuleInitFunc, JSValue, JSValueUnion,
-        JS_AddModuleExport, JS_Call, JS_DefinePropertyValue, JS_EvalFunction, JS_GetException,
-        JS_NewAtomLen, JS_NewCFunction2, JS_NewCModule, JS_NewClass, JS_NewClassID,
-        JS_NewObjectProtoClass, JS_NewObjectWithProto, JS_ReadObject, JS_SetClassProto,
-        JS_SetConstructor, JS_SetModuleExportList, JS_SetPropertyFunctionList, JS_WriteObject,
-        JS_DEF_CFUNC, JS_DEF_CGETSET, JS_PROP_CONFIGURABLE, JS_PROP_WRITABLE, JS_READ_OBJ_BYTECODE,
-        JS_WRITE_OBJ_BYTECODE,
+        JS_AddModuleExport, JS_AtomToString, JS_Call, JS_DefinePropertyValue, JS_EvalFunction,
+        JS_GetException, JS_GetModuleName, JS_NewAtomLen, JS_NewCFunction2, JS_NewCModule,
+        JS_NewClass, JS_NewClassID, JS_NewObjectProtoClass, JS_NewObjectWithProto, JS_ReadObject,
+        JS_SetClassProto, JS_SetConstructor, JS_SetModuleExportList, JS_SetPropertyFunctionList,
+        JS_WriteObject, JS_DEF_CFUNC, JS_DEF_CGETSET, JS_PROP_CONFIGURABLE, JS_PROP_WRITABLE,
+        JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE,
     },
-    Context, JSCGetter, JSCSetter, JsAtom, JsCompiledFunction, JsFunction, JsModuleDef, JsValue,
-    JS_UNDEFINED,
+    Context, JSCGetter, JSCSetter, JsAtom, JsCompiledFunction, JsFunction, JsModuleDef, JsString,
+    JsValue, JS_UNDEFINED,
 };
 
 pub fn js_eval<'a>(
@@ -310,11 +310,11 @@ pub fn call_function<'a>(
 
 /// 创建 C 模块，并在模块上关联本地对象初始化方法（该方法会创建所有的本地对象）
 /// 本地方法列表并不会导出，导出需要通过 JS_AddModuleExport() 进行设置
-pub fn new_c_module(
-    ctx: &Context,
+pub fn new_c_module<'a>(
+    ctx: &'a Context,
     module_name: &str,
     module_init_func: JSModuleInitFunc,
-) -> Result<JsModuleDef, Error> {
+) -> Result<JsModuleDef<'a>, Error> {
     // pub type JSModuleInitFunc = ::std::option::Option<
     //     unsafe extern "C" fn(ctx: *mut JSContext, m: *mut JSModuleDef) -> ::std::os::raw::c_int,
     // >;
@@ -328,7 +328,7 @@ pub fn new_c_module(
         )))?;
     }
 
-    let module_def = JsModuleDef::new(module_def_ptr);
+    let module_def = JsModuleDef::new(ctx, module_def_ptr);
 
     Ok(module_def)
 }
@@ -504,6 +504,21 @@ pub fn new_object_proto_class<'a>(
     assert_exception(ctx, &val, "new_object_proto_class() is failed")?;
 
     Ok(val)
+}
+
+pub fn get_module_name<'a>(ctx: &'a Context, module: &JsModuleDef) -> JsAtom<'a> {
+    let value = unsafe { JS_GetModuleName(ctx.inner, module.raw_value() as _) };
+    JsAtom::new(ctx, value)
+}
+
+pub fn atom_to_string<'a>(ctx: &'a Context, val: JSAtom) -> JsValue<'a> {
+    let val = unsafe { JS_AtomToString(ctx.inner, val) };
+    JsValue::new(ctx, val)
+}
+
+pub fn new_raw_atom<'a>(ctx: &'a Context, val: &str) -> JSAtom {
+    let val = make_cstring(val).expect("make_cstring() failed");
+    unsafe { JS_NewAtomLen(ctx.inner, val.as_ptr() as _, 9) }
 }
 
 #[cfg(test)]

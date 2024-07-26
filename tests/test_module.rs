@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::ffi::c_int;
-use std::fs;
 use std::ptr::null_mut;
+use std::fs;
 
 use anyhow::Error;
 use ez_quick_js::ffi::{
@@ -11,14 +11,14 @@ use ez_quick_js::ffi::{
     JS_NewCFunction2, JS_NewClass, JS_NewInt32, JS_NewObject, JS_NewObjectProtoClass,
     JS_PromiseResult, JS_PromiseState, JS_SetClassProto, JS_SetConstructor, JS_SetModuleExport,
     JS_SetOpaque, JS_SetPropertyFunctionList, JS_ToInt32, JS_ToStr, JS_EVAL_TYPE_GLOBAL,
-    JS_EVAL_TYPE_MODULE, JS_TAG_INT, 
+    JS_EVAL_TYPE_MODULE, JS_TAG_INT,
 };
 use ez_quick_js::function::{add_module_export, new_class_id, C_FUNC_DEF, C_GET_SET_DEF};
 use ez_quick_js::{
     ffi::{JSCFunctionListEntry, JSContext, JSValue},
     Context, Runtime,
 };
-use ez_quick_js::{JsAtom, JsModuleDef, JsValue, JS_EXCEPTION, JS_UNDEFINED};
+use ez_quick_js::{JsModuleDef, JsValue, JS_EXCEPTION, JS_UNDEFINED};
 use once_cell::sync::Lazy;
 
 #[derive(Debug, Clone)]
@@ -266,7 +266,7 @@ unsafe extern "C" fn init_module_inner(ctx: *mut JSContext, m: *mut JSModuleDef)
 }
 
 /// 创建模块并导出对象
-fn init_module(ctx: &Context, module_name: &str) -> Result<JsModuleDef, Error> {
+fn init_module<'a>(ctx: &'a Context, module_name: &str) -> Result<JsModuleDef<'a>, Error> {
     // 创建模块，并初始化模块内本地对象
     let m = ctx.new_module(module_name, Some(init_module_inner))?;
 
@@ -322,10 +322,10 @@ fn test_module() -> Result<(), Error> {
         };
 
         assert!(ff_module != null_mut());
-        
+
         let ret_val_entry = {
             let ret_atom = JS_NewAtomLen(ctx.inner, b"ret_val\0".as_ptr() as _, 7);
-            Find_Export_Entry(ctx.inner, ff_module, ret_atom as _)
+            Find_Export_Entry(ctx.inner, ff_module, ret_atom)
         };
 
         let export_name = {
@@ -340,30 +340,34 @@ fn test_module() -> Result<(), Error> {
         let ret_val = ret_val.to_int().unwrap().value();
         assert_eq!(40, ret_val);
 
-        let default_entry = {
-            let ret_atom = JS_NewAtomLen(ctx.inner, b"default\0".as_ptr() as _, 7);
-            let atom = JsAtom::new(ctx, ret_atom);
-            let name = atom.to_str();
-            assert_eq!("default", name);
-            Find_Export_Entry(ctx.inner, ff_module, ret_atom as _)
-        };
+        // let default_entry = {
+        //     let ret_atom = JS_NewAtomLen(ctx.inner, b"default\0".as_ptr() as _, 7);
+        //     let atom = JsAtom::new(ctx, ret_atom);
+        //     let name = atom.to_str();
+        //     assert_eq!("default", name);
+        //     Find_Export_Entry(ctx.inner, ff_module, ret_atom)
+        // };
 
-        {
-            let export_name = {
-                let val = JS_AtomToString(ctx.inner, (*default_entry).export_name);
-                JS_ToStr(ctx.inner, val)
-            };
-            assert_eq!("default", export_name);
-           
-    
-            let default_val = JsValue::new(ctx, *(*(*default_entry).u.local.var_ref).pvalue);
-            let tmp = default_val.to_string().unwrap();
-            let default_str = tmp.value();
-            assert_eq!("evan", default_str);
-        }
+        // {
+        //     let export_name = {
+        //         let val = JS_AtomToString(ctx.inner, (*default_entry).export_name);
+        //         JS_ToStr(ctx.inner, val)
+        //     };
+        //     assert_eq!("default", export_name);
+
+        //     let default_val = JsValue::new(ctx, *(*(*default_entry).u.local.var_ref).pvalue);
+        //     let tmp = default_val.to_string().unwrap();
+        //     let default_str = tmp.value();
+        //     assert_eq!("evan", default_str);
+        // }
+
+        let ff_module = JsModuleDef::new(ctx, ff_module);
+        let default_entry = ff_module.find_export_entry("default");
+        assert!(default_entry.is_some());
+
+        let default_val = default_entry.unwrap().export_value().to_string().unwrap();
+        assert_eq!("evan", default_val.value());
     }
-
-
 
     Ok(())
 }

@@ -30,7 +30,7 @@ fn main() -> Result<(), Error> {
 }
 
 /// 创建模块并导出对象
-fn init_module(ctx: &Context, module_name: &str) -> Result<JsModuleDef, Error> {
+fn init_module<'a>(ctx: &'a Context, module_name: &str) -> Result<JsModuleDef<'a>, Error> {
     // 创建模块，并初始化模块内本地对象
     let m = ctx.new_module(module_name, Some(init_module_inner_object))?;
 
