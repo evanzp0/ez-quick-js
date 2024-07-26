@@ -1,16 +1,14 @@
-use std::ffi::c_void;
+use std::{borrow::Cow, ffi::c_void};
 
 use crate::{
     common::{make_cstring, Error},
     ffi::{
-        JSContext, JSRefCountHeader, JSValue, JSValueUnion, JS_DupValue, JS_FreeValue,
-        JS_NewFloat64, JS_NewInt32, JS_NewString, JS_ToF64, JS_ToI32, JS_ATOM_NULL, JS_MKVAL,
-        JS_TAG_EXCEPTION, JS_TAG_NULL, JS_TAG_UNDEFINED,
+        JSContext, JSRefCountHeader, JSValue, JSValueUnion, JS_AtomToString, JS_DupValue, JS_FreeValue, JS_NewFloat64, JS_NewInt32, JS_NewString, JS_ToF64, JS_ToI32, JS_ToStr, JS_ATOM_NULL, JS_MKVAL, JS_TAG_EXCEPTION, JS_TAG_NULL, JS_TAG_UNDEFINED
     },
     function::{get_last_exception, run_compiled_function, to_bytecode},
 };
 
-pub type JSCGetter =
+pub type JSCGetter = 
     Option<unsafe extern "C" fn(ctx: *mut JSContext, this_val: JSValue) -> JSValue>;
 pub type JSCSetter =
     Option<unsafe extern "C" fn(ctx: *mut JSContext, this_val: JSValue, val: JSValue) -> JSValue>;
@@ -421,6 +419,7 @@ impl JsModuleDef {
     pub fn raw_value(&self) -> *mut crate::ffi::JSModuleDef {
         self.inner
     }
+
 }
 
 pub struct JsAtom<'a> {
@@ -436,6 +435,12 @@ impl<'a> JsAtom<'a> {
 
     pub fn is_exception(&self) -> bool {
         self.inner == JS_ATOM_NULL
+    }
+
+    
+    pub fn to_str(&self) -> Cow<'a, str> {
+        let val = unsafe { JS_AtomToString(self.ctx.inner, self.inner) };
+        JS_ToStr(self.ctx.inner, val)
     }
 }
 

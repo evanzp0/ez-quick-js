@@ -18,7 +18,7 @@ use ez_quick_js::{
     ffi::{JSCFunctionListEntry, JSContext, JSValue},
     Context, Runtime,
 };
-use ez_quick_js::{JsModuleDef, JsValue, JS_EXCEPTION, JS_UNDEFINED};
+use ez_quick_js::{JsAtom, JsModuleDef, JsValue, JS_EXCEPTION, JS_UNDEFINED};
 use once_cell::sync::Lazy;
 
 #[derive(Debug, Clone)]
@@ -342,6 +342,9 @@ fn test_module() -> Result<(), Error> {
 
         let default_entry = {
             let ret_atom = JS_NewAtomLen(ctx.inner, b"default\0".as_ptr() as _, 7);
+            let atom = JsAtom::new(ctx, ret_atom);
+            let name = atom.to_str();
+            assert_eq!("default", name);
             Find_Export_Entry(ctx.inner, ff_module, ret_atom as _)
         };
 
@@ -351,6 +354,7 @@ fn test_module() -> Result<(), Error> {
                 JS_ToStr(ctx.inner, val)
             };
             assert_eq!("default", export_name);
+           
     
             let default_val = JsValue::new(ctx, *(*(*default_entry).u.local.var_ref).pvalue);
             let tmp = default_val.to_string().unwrap();
