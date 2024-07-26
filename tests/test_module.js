@@ -5,6 +5,9 @@ g.val = 4;
 
 let ret_val = 40;
 
-export default "evan";
+function add_one(val) {
+    return val + 1;
+}
 
-export { ret_val };
+export default "evan";
+export { ret_val, add_one };

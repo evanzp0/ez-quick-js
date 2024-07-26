@@ -13,12 +13,12 @@ use ez_quick_js::ffi::{
     JS_SetOpaque, JS_SetPropertyFunctionList, JS_ToInt32, JS_ToStr, JS_EVAL_TYPE_GLOBAL,
     JS_EVAL_TYPE_MODULE, JS_TAG_INT,
 };
-use ez_quick_js::function::{add_module_export, new_class_id, C_FUNC_DEF, C_GET_SET_DEF};
+use ez_quick_js::function::{add_module_export, call_js_function, new_class_id, C_FUNC_DEF, C_GET_SET_DEF};
 use ez_quick_js::{
     ffi::{JSCFunctionListEntry, JSContext, JSValue},
     Context, Runtime,
 };
-use ez_quick_js::{JsModuleDef, JsValue, JS_EXCEPTION, JS_UNDEFINED};
+use ez_quick_js::{JsInteger, JsModuleDef, JsValue, JS_EXCEPTION, JS_UNDEFINED};
 use once_cell::sync::Lazy;
 
 #[derive(Debug, Clone)]
@@ -314,14 +314,12 @@ fn test_module() -> Result<(), Error> {
     }
 
     // assert -----------------
-
+    let ff_module = unsafe {
+        let ff_atom = JS_NewAtomLen(ctx.inner, b"ff_module\0".as_ptr() as _, 9);
+        JS_Find_Loaded_Module(ctx.inner, ff_atom)
+    };
+    assert!(ff_module != null_mut());
     unsafe {
-        let ff_module = {
-            let ff_atom = JS_NewAtomLen(ctx.inner, b"ff_module\0".as_ptr() as _, 9);
-            JS_Find_Loaded_Module(ctx.inner, ff_atom)
-        };
-
-        assert!(ff_module != null_mut());
 
         let ret_val_entry = {
             let ret_atom = JS_NewAtomLen(ctx.inner, b"ret_val\0".as_ptr() as _, 7);
@@ -339,7 +337,10 @@ fn test_module() -> Result<(), Error> {
         let ret_val = JsValue::new(ctx, *(*(*ret_val_entry).u.local.var_ref).pvalue);
         let ret_val = ret_val.to_int().unwrap().value();
         assert_eq!(40, ret_val);
+    }
 
+    let ff_module = JsModuleDef::new(ctx, ff_module);
+    {
         // let default_entry = {
         //     let ret_atom = JS_NewAtomLen(ctx.inner, b"default\0".as_ptr() as _, 7);
         //     let atom = JsAtom::new(ctx, ret_atom);
@@ -361,12 +362,21 @@ fn test_module() -> Result<(), Error> {
         //     assert_eq!("evan", default_str);
         // }
 
-        let ff_module = JsModuleDef::new(ctx, ff_module);
-        let default_entry = ff_module.find_export_entry("default");
-        assert!(default_entry.is_some());
+        let entry = ff_module.find_export_entry("default");
+        assert!(entry.is_some());
 
-        let default_val = default_entry.unwrap().export_value().to_string().unwrap();
-        assert_eq!("evan", default_val.value());
+        let val = entry.unwrap().export_value().to_string().unwrap();
+        assert_eq!("evan", val.value());
+    }
+
+    {
+        let entry = ff_module.find_export_entry("add_one");
+        assert!(entry.is_some());
+        let js_func = entry.unwrap().export_value();
+        let param = JsInteger::new(ctx, 2);
+        let rst = call_js_function(ctx, &js_func, None, &vec![&param.to_value()]);
+        assert!(rst.is_ok());
+        assert_eq!(3, rst.unwrap().to_int().unwrap().value());
     }
 
     Ok(())

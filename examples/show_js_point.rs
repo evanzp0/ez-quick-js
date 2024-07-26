@@ -5,7 +5,7 @@ use ez_quick_js::{
         JSContext, JSValue, JS_GetPropertyStr, JS_NewInt32, JS_ToI32, JS_ToStr,
         JS_EVAL_TYPE_GLOBAL, JS_PROP_C_W_E,
     },
-    function::call_function,
+    function::call_js_function,
     Context, JsValue, Runtime, JS_UNDEFINED,
 };
 
@@ -23,7 +23,7 @@ fn main() {
         .unwrap();
     let js_show_point_fn = global_obj.get_property("show_point").unwrap();
     let js_point_obj = create_js_point(ctx, 2, 3);
-    let rst = call_function(ctx, &js_show_point_fn, None, &vec![&js_point_obj]).unwrap();
+    let rst = call_js_function(ctx, &js_show_point_fn, None, &vec![&js_point_obj]).unwrap();
     let point = get_point_from_js(ctx.inner, *rst.raw_value());
     println!("return : {:?}", point);
 }

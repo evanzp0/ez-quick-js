@@ -886,7 +886,12 @@ impl<'a> JsExportEntry<'a> {
     }
 
     pub fn export_value(&self) -> JsValue<'a> {
-        let value = unsafe { *(*self.inner.u.local.var_ref).pvalue };
+        let value = unsafe { 
+            let v = *(*self.inner.u.local.var_ref).pvalue;
+            JS_DupValue(self.module.ctx.inner, v);
+            v
+        };
+
         JsValue::new(self.module.ctx, value)
     }
 }

@@ -286,7 +286,7 @@ pub fn assert_exception(ctx: &Context, val: &JsValue, err_msg: &str) -> Result<(
 }
 
 /// 调用一个 Javascript Function
-pub fn call_function<'a>(
+pub fn call_js_function<'a>(
     ctx: &'a Context,
     func: &JsValue,
     this_obj: Option<&JsValue>,
